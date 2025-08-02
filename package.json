@@ -1,0 +1,44 @@
+{
+  "name": "deeo_fe",
+  "version": "0.1.0",
+  "private": true,
+  "description": "클라이언트와 디자이너 간의 투명하고 신뢰할 수 있는 프로젝트 관리 SaaS 플랫폼",
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.52.0",
+    "daisyui": "^5.0.46",
+    "next": "15.4.2",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "15.4.2",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  },
+  "keywords": [
+    "saas",
+    "project-management",
+    "design",
+    "client-designer",
+    "nextjs",
+    "react",
+    "typescript",
+    "tailwindcss",
+    "daisyui"
+  ],
+  "author": "Deeo Team",
+  "license": "MIT"
+}
