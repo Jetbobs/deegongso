@@ -1,20 +1,43 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function ProfilePage() {
-  // 임시 사용자 정보 (실제로는 인증된 사용자 정보에서 가져올 것)
-  const userRole = "client" as "client" | "designer";
+  const router = useRouter();
+  const { user, profile, loading } = useAuth();
+
+  // 로딩 중이거나 사용자가 없으면 로딩 화면 표시
+  if (loading || !user) {
+    return (
+      <DashboardLayout title="프로필" userRole="client">
+        <div className="min-h-screen bg-base-200 flex items-center justify-center">
+          <div className="text-center">
+            <div className="loading loading-spinner loading-lg text-primary"></div>
+            <p className="mt-4 text-base-content/60">프로필 로딩 중...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const userRole = (profile?.role as "client" | "designer") || "client";
 
   const userInfo = {
-    name: "홍길동",
-    email: "hong@company.com",
-    phone: "010-1234-5678",
-    company: "ABC 회사",
-    department: "마케팅팀",
+    name: profile?.full_name || user.email?.split("@")[0] || "사용자",
+    email: user.email || "",
+    phone: profile?.phone || "등록되지 않음",
+    company: profile?.company_name || "등록되지 않음",
+    department: profile?.location || "등록되지 않음",
     role: userRole === "client" ? "클라이언트" : "디자이너",
-    joinDate: "2024-01-01",
-    avatar: "JD",
+    joinDate: profile?.created_at
+      ? new Date(profile.created_at).toLocaleDateString()
+      : "알 수 없음",
+    avatar:
+      profile?.full_name?.charAt(0) ||
+      user.email?.charAt(0)?.toUpperCase() ||
+      "U",
   };
 
   return (
@@ -39,8 +62,26 @@ export default function ProfilePage() {
               </div>
 
               <div className="flex gap-2">
-                <button className="btn btn-primary">프로필 수정</button>
-                <button className="btn btn-outline">비밀번호 변경</button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    console.log("🔄 설정 페이지로 이동");
+                    alert("프로필 편집 페이지로 이동합니다!");
+                    router.push("/settings");
+                  }}
+                >
+                  ✏️ 프로필 수정
+                </button>
+                <button
+                  className="btn btn-outline"
+                  onClick={() => {
+                    console.log("🔐 설정 페이지의 계정 섹션으로 이동");
+                    alert("계정 설정 페이지로 이동합니다!");
+                    router.push("/settings?section=account");
+                  }}
+                >
+                  🔐 비밀번호 변경
+                </button>
               </div>
             </div>
           </div>
@@ -103,6 +144,33 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* 프로필 상태 및 안내 */}
+        {!profile && (
+          <div className="card bg-warning/10 border border-warning/20 shadow-sm">
+            <div className="card-body">
+              <div className="flex items-center gap-3">
+                <div className="text-warning text-2xl">⚠️</div>
+                <div>
+                  <h3 className="font-bold text-warning">
+                    프로필 설정이 필요합니다
+                  </h3>
+                  <p className="text-sm text-base-content/70">
+                    프로필을 완성하여 더 나은 서비스를 이용하세요.
+                  </p>
+                </div>
+              </div>
+              <div className="card-actions justify-end">
+                <button
+                  className="btn btn-warning btn-sm"
+                  onClick={() => router.push("/settings")}
+                >
+                  지금 설정하기
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 계정 통계 */}
         <div className="card bg-base-100 shadow-sm">
           <div className="card-body">
@@ -111,20 +179,31 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="stat">
                 <div className="stat-title">총 프로젝트</div>
-                <div className="stat-value text-primary">12</div>
+                <div className="stat-value text-primary">
+                  {profile?.total_projects || 0}
+                </div>
                 <div className="stat-desc">완료된 프로젝트 포함</div>
               </div>
 
               <div className="stat">
-                <div className="stat-title">진행 중인 프로젝트</div>
-                <div className="stat-value text-secondary">3</div>
-                <div className="stat-desc">현재 활성 상태</div>
+                <div className="stat-title">계정 등급</div>
+                <div className="stat-value text-secondary">
+                  {profile?.is_verified ? "인증됨" : "미인증"}
+                </div>
+                <div className="stat-desc">
+                  {profile?.is_verified ? "✅ 인증된 계정" : "📝 인증 필요"}
+                </div>
               </div>
 
               <div className="stat">
                 <div className="stat-title">평균 평점</div>
-                <div className="stat-value text-accent">4.8</div>
-                <div className="stat-desc">⭐⭐⭐⭐⭐</div>
+                <div className="stat-value text-accent">
+                  {profile?.rating || 0}
+                </div>
+                <div className="stat-desc">
+                  {"⭐".repeat(Math.round(profile?.rating || 0))}
+                  {profile?.rating ? ` (${profile.rating}/5)` : " (평가 없음)"}
+                </div>
               </div>
             </div>
           </div>

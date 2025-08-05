@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Link from "next/link";
+import { useAuth } from "@/hooks/useAuth";
 import { Project } from "@/types";
 
 // 모의 프로젝트 데이터
@@ -97,16 +98,16 @@ const designerNames: Record<string, string> = {
 };
 
 export default function ProjectsPage() {
-  const userRole = "client" as const;
+  const { user, profile, loading } = useAuth();
 
-  // 검색 및 필터 상태
+  // 모든 state Hook들을 먼저 호출 - Hook 순서 보장
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [designerFilter, setDesignerFilter] = useState("all");
   const [sortBy, setSortBy] = useState("updated_desc");
   const [showArchived, setShowArchived] = useState(false);
 
-  // 필터링 및 정렬된 프로젝트 목록
+  // 필터링 및 정렬된 프로젝트 목록 - useMemo도 조건부 return 이전에 호출
   const filteredProjects = useMemo(() => {
     let filtered = mockProjects.filter((project) => {
       // 아카이브 필터
@@ -237,6 +238,22 @@ export default function ProjectsPage() {
     setSortBy("updated_desc");
   };
 
+  const userRole = (profile?.role as "client" | "designer") || "client";
+
+  // 로딩 중이거나 사용자가 없으면 로딩 화면 표시 - 모든 Hook과 함수 정의 이후
+  if (loading || !user) {
+    return (
+      <DashboardLayout title="내 프로젝트" userRole="client">
+        <div className="min-h-screen bg-base-200 flex items-center justify-center">
+          <div className="text-center">
+            <div className="loading loading-spinner loading-lg text-primary"></div>
+            <p className="mt-4 text-base-content/60">프로젝트 로딩 중...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout title="내 프로젝트" userRole={userRole}>
       <div className="flex items-center justify-between mb-6">
@@ -246,7 +263,14 @@ export default function ProjectsPage() {
             진행 중인 프로젝트와 완료된 프로젝트를 관리하세요.
           </p>
         </div>
-        <Link href="/projects/create" className="btn btn-primary">
+        <Link
+          href="/projects/create"
+          className="btn btn-primary"
+          onClick={() => {
+            console.log("🔄 새 프로젝트 생성 버튼 클릭!");
+            alert("프로젝트 생성 페이지로 이동합니다!");
+          }}
+        >
           새 프로젝트 생성
         </Link>
       </div>
@@ -409,7 +433,14 @@ export default function ProjectsPage() {
               : "새로운 프로젝트를 시작해보세요!"}
           </p>
           {!showArchived && (
-            <Link href="/projects/create" className="btn btn-primary">
+            <Link
+              href="/projects/create"
+              className="btn btn-primary"
+              onClick={() => {
+                console.log("🔄 빈 목록 프로젝트 생성 버튼 클릭!");
+                alert("프로젝트 생성 페이지로 이동합니다!");
+              }}
+            >
               새 프로젝트 생성
             </Link>
           )}
@@ -573,7 +604,14 @@ export default function ProjectsPage() {
                   디자이너와 함께 새로운 프로젝트를 시작하세요
                 </p>
                 <div className="card-actions">
-                  <Link href="/projects/create" className="btn btn-primary">
+                  <Link
+                    href="/projects/create"
+                    className="btn btn-primary"
+                    onClick={() => {
+                      console.log("🔄 카드 형태 프로젝트 생성 버튼 클릭!");
+                      alert("프로젝트 생성 페이지로 이동합니다!");
+                    }}
+                  >
                     프로젝트 생성
                   </Link>
                 </div>

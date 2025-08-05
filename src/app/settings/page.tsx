@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { useAuth } from "@/hooks/useAuth";
+import { createClientComponentClient } from "@/lib/supabase/client";
 
 type SettingsSection =
   | "profile"
@@ -38,11 +41,74 @@ const mockUserProfile: UserProfile = {
 };
 
 export default function SettingsPage() {
+  const { user, profile } = useAuth();
+  const supabase = createClientComponentClient();
+  const searchParams = useSearchParams();
+
+  // URL 쿼리 파라미터에서 section 읽기
+  const sectionParam = searchParams.get("section") as SettingsSection;
+  const initialSection: SettingsSection =
+    sectionParam &&
+    [
+      "profile",
+      "account",
+      "notifications",
+      "security",
+      "payment",
+      "subscription",
+    ].includes(sectionParam)
+      ? sectionParam
+      : "profile";
+
   const [activeSection, setActiveSection] =
-    useState<SettingsSection>("profile");
+    useState<SettingsSection>(initialSection);
   const [userProfile, setUserProfile] = useState<UserProfile>(mockUserProfile);
   const [isEditing, setIsEditing] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // 실제 프로필 데이터가 로드되면 userProfile 상태 업데이트
+  useEffect(() => {
+    console.log("🔄 설정 페이지에서 프로필 상태 확인:", { user, profile });
+
+    if (profile && user) {
+      const mappedProfile: UserProfile = {
+        name: profile.full_name || user.email?.split("@")[0] || "",
+        email: user.email || "",
+        phone: profile.phone || "",
+        company: profile.company_name || "",
+        avatar: profile.avatar_url || "",
+        role: (profile.role as "client" | "designer") || "client",
+        address: profile.location || "",
+        position: undefined, // 이 필드는 UI 전용
+        specialties: profile.skills,
+        portfolioLinks: profile.portfolio_url ? [profile.portfolio_url] : [],
+        bio: profile.bio,
+        hourlyRate: profile.hourly_rate,
+      };
+      console.log("✅ 프로필 데이터 매핑 완료:", mappedProfile);
+      setUserProfile(mappedProfile);
+    }
+  }, [user, profile]);
+
+  // URL 파라미터 변경 시 activeSection 업데이트
+  useEffect(() => {
+    const sectionParam = searchParams.get("section") as SettingsSection;
+    if (
+      sectionParam &&
+      [
+        "profile",
+        "account",
+        "notifications",
+        "security",
+        "payment",
+        "subscription",
+      ].includes(sectionParam)
+    ) {
+      console.log("🔄 URL 파라미터로 섹션 변경:", sectionParam);
+      setActiveSection(sectionParam);
+    }
+  }, [searchParams]);
 
   const userRole = userProfile.role;
 
@@ -65,12 +131,139 @@ export default function SettingsPage() {
     },
   ];
 
-  const saveChanges = () => {
-    // 실제로는 API 호출
-    setIsEditing(false);
-    setHasChanges(false);
-    // 성공 토스트 표시
-    alert("변경사항이 저장되었습니다.");
+  const saveChanges = async () => {
+    if (!user?.id) {
+      alert("❌ 사용자 정보를 찾을 수 없습니다.");
+      return;
+    }
+
+    if (!user?.email) {
+      alert("❌ 사용자 이메일 정보를 찾을 수 없습니다.");
+      return;
+    }
+
+    setIsSaving(true);
+    console.log("💾 프로필 저장 시작:", {
+      userId: user.id,
+      userEmail: user.email,
+      userProfile,
+    });
+
+    try {
+      // user_profiles 테이블에 업데이트할 데이터 준비
+      const updateData = {
+        email: user.email, // NOT NULL 제약조건 필수 필드
+        full_name: userProfile.name,
+        phone: userProfile.phone,
+        company_name: userProfile.company,
+        location: userProfile.address,
+        role: userProfile.role,
+        skills: userProfile.specialties,
+        portfolio_url: userProfile.portfolioLinks?.[0] || null, // 첫 번째 링크만 저장
+        bio: userProfile.bio,
+        hourly_rate: userProfile.hourlyRate,
+        updated_at: new Date().toISOString(),
+      };
+
+      console.log("📊 업데이트할 데이터:", updateData);
+
+      // Supabase에 프로필 업데이트
+      const { data, error } = await supabase
+        .from("user_profiles")
+        .update(updateData)
+        .eq("id", user.id)
+        .select();
+
+      console.log("📊 Supabase 업데이트 결과:", { data, error });
+
+      if (error) {
+        console.error("❌ 프로필 저장 오류:", error);
+        console.error("🔍 오류 세부사항:", {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          updateData,
+        });
+
+        let errorMessage = `❌ 저장 실패: ${error.message}`;
+
+        // 특정 오류에 대한 사용자 친화적 메시지
+        if (
+          error.message.includes("email") &&
+          error.message.includes("not-null")
+        ) {
+          errorMessage +=
+            "\n\n💡 해결 방법: 이메일 정보가 누락되었습니다. 페이지를 새로고침한 후 다시 시도해주세요.";
+        }
+
+        alert(errorMessage);
+        return;
+      }
+
+      // 프로필이 존재하지 않으면 새로 생성
+      if (!data || data.length === 0) {
+        console.log("⚠️ 프로필이 없어서 새로 생성합니다.");
+
+        const insertData = {
+          id: user.id,
+          ...updateData,
+          // 기본값이 필요한 필드들 추가
+          is_verified: false,
+          rating: 0,
+          total_projects: 0,
+          created_at: new Date().toISOString(),
+        };
+
+        const { data: insertResult, error: insertError } = await supabase
+          .from("user_profiles")
+          .insert(insertData)
+          .select();
+
+        console.log("📊 Supabase 생성 결과:", { insertResult, insertError });
+
+        if (insertError) {
+          console.error("❌ 프로필 생성 오류:", insertError);
+          console.error("🔍 생성 오류 세부사항:", {
+            code: insertError.code,
+            message: insertError.message,
+            details: insertError.details,
+            hint: insertError.hint,
+            insertData,
+          });
+
+          let errorMessage = `❌ 생성 실패: ${insertError.message}`;
+
+          // 특정 오류에 대한 사용자 친화적 메시지
+          if (
+            insertError.message.includes("email") &&
+            insertError.message.includes("not-null")
+          ) {
+            errorMessage +=
+              "\n\n💡 해결 방법: 이메일 정보가 누락되었습니다. 로그아웃 후 다시 로그인해주세요.";
+          }
+
+          alert(errorMessage);
+          return;
+        }
+      }
+
+      // 성공 처리
+      setIsEditing(false);
+      setHasChanges(false);
+      console.log("✅ 프로필 저장 성공!");
+      alert("✅ 변경사항이 성공적으로 저장되었습니다!");
+
+      // 페이지 새로고침으로 최신 데이터 반영
+      window.location.reload();
+    } catch (error: any) {
+      console.error("💥 예상치 못한 저장 오류:", error);
+      alert(
+        `💥 저장 중 오류가 발생했습니다: ${error?.message || "알 수 없는 오류"}`
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const cancelChanges = () => {
@@ -78,6 +271,32 @@ export default function SettingsPage() {
     setHasChanges(false);
     // 변경사항 원복
   };
+
+  // 사용자가 로그인하지 않은 경우
+  if (!user) {
+    return (
+      <DashboardLayout title="설정" userRole="client">
+        <div className="min-h-screen bg-base-200 flex items-center justify-center">
+          <div className="card bg-base-100 shadow-xl w-96">
+            <div className="card-body text-center">
+              <h2 className="card-title justify-center text-error">
+                ⚠️ 접근 제한
+              </h2>
+              <p>설정 페이지에 접근하려면 로그인이 필요합니다.</p>
+              <div className="card-actions justify-center">
+                <button
+                  className="btn btn-primary"
+                  onClick={() => (window.location.href = "/")}
+                >
+                  로그인 페이지로 이동
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout title="설정" userRole={userRole}>
@@ -126,12 +345,14 @@ export default function SettingsPage() {
           <div className="lg:col-span-3">
             {activeSection === "profile" && (
               <ProfileSection
+                user={user}
                 userProfile={userProfile}
                 setUserProfile={setUserProfile}
                 isEditing={isEditing}
                 setIsEditing={setIsEditing}
                 hasChanges={hasChanges}
                 setHasChanges={setHasChanges}
+                isSaving={isSaving}
                 onSave={saveChanges}
                 onCancel={cancelChanges}
               />
@@ -154,21 +375,25 @@ export default function SettingsPage() {
 
 // 프로필 정보 섹션
 function ProfileSection({
+  user,
   userProfile,
   setUserProfile,
   isEditing,
   setIsEditing,
   hasChanges,
   setHasChanges,
+  isSaving,
   onSave,
   onCancel,
 }: {
+  user: any; // useAuth에서 가져온 user 객체
   userProfile: UserProfile;
   setUserProfile: (profile: UserProfile) => void;
   isEditing: boolean;
   setIsEditing: (editing: boolean) => void;
   hasChanges: boolean;
   setHasChanges: (changes: boolean) => void;
+  isSaving: boolean;
   onSave: () => void;
   onCancel: () => void;
 }) {
@@ -205,9 +430,16 @@ function ProfileSection({
                   <button
                     className="btn btn-primary"
                     onClick={onSave}
-                    disabled={!hasChanges}
+                    disabled={!hasChanges || isSaving}
                   >
-                    💾 저장
+                    {isSaving ? (
+                      <>
+                        <span className="loading loading-spinner loading-sm"></span>
+                        저장 중...
+                      </>
+                    ) : (
+                      <>💾 저장</>
+                    )}
                   </button>
                 </>
               )}
@@ -353,6 +585,71 @@ function ProfileSection({
           isEditing={isEditing}
         />
       )}
+
+      {/* 저장 디버깅 정보 */}
+      <div className="card bg-blue-50 shadow-sm">
+        <div className="card-body">
+          <h3 className="text-lg font-bold mb-4 text-blue-800">
+            🔍 저장 디버깅 정보
+          </h3>
+
+          <div className="space-y-3 text-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <p className="font-medium text-blue-700">저장될 데이터:</p>
+                <div className="bg-blue-100 p-3 rounded text-xs font-mono">
+                  <p>• DB 이메일: {user?.email || "❌ 없음"}</p>
+                  <p>• 이름: {userProfile.name || "없음"}</p>
+                  <p>• UI 이메일: {userProfile.email || "없음"}</p>
+                  <p>• 전화번호: {userProfile.phone || "없음"}</p>
+                  <p>• 회사: {userProfile.company || "없음"}</p>
+                  <p>• 주소: {userProfile.address || "없음"}</p>
+                  <p>• 역할: {userProfile.role || "없음"}</p>
+                  {userProfile.role === "client" && (
+                    <p>• 직책: {userProfile.position || "없음"}</p>
+                  )}
+                  {userProfile.role === "designer" && (
+                    <>
+                      <p>
+                        • 전문분야: {userProfile.specialties?.length || 0}개
+                      </p>
+                      <p>• 시간당 요율: {userProfile.hourlyRate || "없음"}</p>
+                      <p>
+                        • 자기소개:{" "}
+                        {userProfile.bio
+                          ? `${userProfile.bio.slice(0, 30)}...`
+                          : "없음"}
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="font-medium text-blue-700">저장 상태:</p>
+                <div className="bg-blue-100 p-3 rounded text-xs">
+                  <p>• 편집 중: {isEditing ? "✅" : "❌"}</p>
+                  <p>• 변경사항 있음: {hasChanges ? "✅" : "❌"}</p>
+                  <p>• 저장 중: {isSaving ? "✅" : "❌"}</p>
+                  <p>• 저장 가능: {hasChanges && !isSaving ? "✅" : "❌"}</p>
+                </div>
+
+                {isEditing && (
+                  <button
+                    className="btn btn-sm btn-info w-full"
+                    onClick={() => {
+                      console.log("🔍 현재 프로필 상태:", userProfile);
+                      alert("콘솔에서 현재 프로필 상태를 확인하세요!");
+                    }}
+                  >
+                    🔍 콘솔에 상태 출력
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

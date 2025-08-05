@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { useAuth } from "@/hooks/useAuth";
 
 // 단계 타입 정의
 type Step = 1 | 2 | 3 | 4;
@@ -38,6 +39,9 @@ interface ProjectFormData {
 }
 
 export default function ProjectCreatePage() {
+  const { user, profile, loading } = useAuth();
+
+  // 모든 state Hook들을 먼저 호출 - Hook 순서 보장
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [formData, setFormData] = useState<ProjectFormData>({
     name: "",
@@ -58,7 +62,33 @@ export default function ProjectCreatePage() {
     paymentTerms: "",
   });
 
-  const userRole = "designer" as const;
+  const userRole = (profile?.role as "client" | "designer") || "client";
+
+  // 페이지 로드 시 디버깅 로그
+  useEffect(() => {
+    console.log("🔄 프로젝트 생성 페이지 로드됨");
+    console.log("👤 사용자 상태:", {
+      user: !!user,
+      userEmail: user?.email,
+      profile: !!profile,
+      profileName: profile?.full_name,
+      userRole,
+    });
+  }, [user, profile, userRole]);
+
+  // 로딩 중이거나 사용자가 없으면 로딩 화면 표시 - 모든 Hook 이후
+  if (loading || !user) {
+    return (
+      <DashboardLayout title="새 프로젝트 생성" userRole="client">
+        <div className="min-h-screen bg-base-200 flex items-center justify-center">
+          <div className="text-center">
+            <div className="loading loading-spinner loading-lg text-primary"></div>
+            <p className="mt-4 text-base-content/60">페이지 로딩 중...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   const updateFormData = (field: keyof ProjectFormData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -78,9 +108,13 @@ export default function ProjectCreatePage() {
 
   const handleSubmit = () => {
     // TODO: API 호출로 프로젝트 생성 및 클라이언트에게 검토 요청
-    console.log("프로젝트 생성 데이터:", formData);
+    console.log("💾 프로젝트 생성 데이터:", formData);
+    console.log("👤 사용자 정보:", {
+      user: user?.email,
+      profile: profile?.full_name,
+    });
     alert(
-      "프로젝트가 생성되었습니다! 클라이언트에게 검토 요청을 발송했습니다."
+      "✅ 프로젝트가 생성되었습니다! 클라이언트에게 검토 요청을 발송했습니다."
     );
   };
 
