@@ -1,15 +1,35 @@
 // 사용자 관련 타입
 export type UserRole = "client" | "designer";
 
-export interface User {
+// 기본 사용자 정보
+export interface BaseUser {
   id: string;
   email: string;
   name: string;
+  phone: string;
   role: UserRole;
   avatar_url?: string;
   created_at: string;
   updated_at: string;
 }
+
+// 클라이언트 사용자 정보
+export interface ClientUser extends BaseUser {
+  role: "client";
+  company?: string;
+  department?: string;
+}
+
+// 디자이너 사용자 정보
+export interface DesignerUser extends BaseUser {
+  role: "designer";
+  experience?: string;
+  specialization?: string[];
+  portfolio_url?: string;
+}
+
+// 유니온 타입
+export type User = ClientUser | DesignerUser;
 
 // 프로젝트 관련 타입
 export type ProjectStatus =
