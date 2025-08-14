@@ -1,7 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { useAuth } from "@/hooks/useAuth";
+import AuthWrapper from "@/components/auth/AuthWrapper";
+import { UserRole } from "@/types";
+import {
+  NotificationSettings,
+  NotificationSettingsType,
+  requestNotificationPermission,
+  getNotificationPermission,
+} from "@/lib/pushNotifications";
 
 type SettingsSection =
   | "profile"
@@ -24,9 +33,11 @@ interface UserProfile {
   portfolioLinks?: string[]; // 디자이너 전용
   bio?: string; // 디자이너 전용
   hourlyRate?: number; // 디자이너 전용
+  rateVisible?: boolean; // 디자이너 전용 - 단가 공개 여부
 }
 
-const mockUserProfile: UserProfile = {
+// 기본 클라이언트 프로필
+const defaultClientProfile: UserProfile = {
   name: "홍길동",
   email: "hong@company.com",
   phone: "010-1234-5678",
@@ -37,14 +48,60 @@ const mockUserProfile: UserProfile = {
   position: "마케팅 팀장",
 };
 
+// 기본 디자이너 프로필
+const defaultDesignerProfile: UserProfile = {
+  name: "김디자이너",
+  email: "designer@example.com",
+  phone: "010-9876-5432",
+  company: "크리에이티브 스튜디오",
+  avatar: "",
+  role: "designer",
+  address: "서울시 홍대입구 창작마을 456",
+  specialties: ["브랜딩", "웹 디자인", "UI/UX"],
+  portfolioLinks: [
+    "https://portfolio.example.com",
+    "https://behance.net/designer",
+  ],
+  bio: "3년 차 디자이너로 브랜딩과 웹 디자인을 전문으로 합니다. 클라이언트와의 소통을 중시하며 창의적이고 실용적인 디자인을 추구합니다.",
+  hourlyRate: 50000,
+  rateVisible: false,
+};
+
 export default function SettingsPage() {
+  const { user } = useAuth();
+  const userRole: UserRole = user?.role ?? user?.userType ?? "client";
   const [activeSection, setActiveSection] =
     useState<SettingsSection>("profile");
-  const [userProfile, setUserProfile] = useState<UserProfile>(mockUserProfile);
+
+  // 사용자 역할에 따라 적절한 기본 프로필 선택
+  const getInitialProfile = (): UserProfile => {
+    const baseProfile =
+      userRole === "designer" ? defaultDesignerProfile : defaultClientProfile;
+    // useAuth의 사용자 정보가 있으면 병합
+    if (user) {
+      return {
+        ...baseProfile,
+        name: user.name || baseProfile.name,
+        email: user.email || baseProfile.email,
+        role: userRole,
+      };
+    }
+    return baseProfile;
+  };
+
+  const [userProfile, setUserProfile] = useState<UserProfile>(
+    getInitialProfile()
+  );
   const [isEditing, setIsEditing] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
-  const userRole = userProfile.role;
+  // 사용자 정보가 변경될 때 프로필 업데이트
+  useEffect(() => {
+    setUserProfile(getInitialProfile());
+  }, [user, userRole]);
+
+  // NOTE: 좌측 메뉴 및 일부 섹션 표시는 useAuth의 역할을 우선 적용
+  const effectiveRole: UserRole = userRole;
 
   const menuItems = [
     {
@@ -80,75 +137,77 @@ export default function SettingsPage() {
   };
 
   return (
-    <DashboardLayout title="설정" userRole={userRole}>
-      <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* 좌측 서브메뉴 */}
-          <div className="lg:col-span-1">
-            <div className="card bg-base-100 shadow-sm sticky top-4">
-              <div className="card-body p-0">
-                <ul className="menu">
-                  {menuItems.map((category) => (
-                    <div key={category.category}>
-                      <li className="menu-title">{category.category}</li>
-                      {category.items.map((item) => (
-                        <li
-                          key={item.id}
-                          style={{
-                            display: [
-                              "security",
-                              "payment",
-                              "subscription",
-                            ].includes(item.id)
-                              ? "none"
-                              : "block",
-                          }}
-                        >
-                          <a
-                            className={`${
-                              activeSection === item.id ? "active" : ""
-                            } flex items-center gap-2`}
-                            onClick={() => setActiveSection(item.id)}
+    <AuthWrapper requireAuth>
+      <DashboardLayout title="설정" userRole={effectiveRole}>
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* 좌측 서브메뉴 */}
+            <div className="lg:col-span-1">
+              <div className="card bg-base-100 shadow-sm sticky top-4">
+                <div className="card-body p-0">
+                  <ul className="menu">
+                    {menuItems.map((category) => (
+                      <div key={category.category}>
+                        <li className="menu-title">{category.category}</li>
+                        {category.items.map((item) => (
+                          <li
+                            key={item.id}
+                            style={{
+                              display: [
+                                "security",
+                                "payment",
+                                "subscription",
+                              ].includes(item.id)
+                                ? "none"
+                                : "block",
+                            }}
                           >
-                            <span>{item.icon}</span>
-                            {item.label}
-                          </a>
-                        </li>
-                      ))}
-                    </div>
-                  ))}
-                </ul>
+                            <a
+                              className={`${
+                                activeSection === item.id ? "active" : ""
+                              } flex items-center gap-2`}
+                              onClick={() => setActiveSection(item.id)}
+                            >
+                              <span>{item.icon}</span>
+                              {item.label}
+                            </a>
+                          </li>
+                        ))}
+                      </div>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* 우측 컨텐츠 영역 */}
+            <div className="lg:col-span-3">
+              {activeSection === "profile" && (
+                <ProfileSection
+                  userProfile={userProfile}
+                  setUserProfile={setUserProfile}
+                  isEditing={isEditing}
+                  setIsEditing={setIsEditing}
+                  hasChanges={hasChanges}
+                  setHasChanges={setHasChanges}
+                  onSave={saveChanges}
+                  onCancel={cancelChanges}
+                />
+              )}
+              {activeSection === "account" && <AccountSection />}
+              {activeSection === "notifications" && <NotificationsSection />}
+              <div style={{ display: "none" }}>
+                {activeSection === "security" && <SecuritySection />}
+                {activeSection === "payment" && (
+                  <PaymentSection userRole={effectiveRole} />
+                )}
+                {activeSection === "subscription" && <SubscriptionSection />}
               </div>
             </div>
           </div>
-
-          {/* 우측 컨텐츠 영역 */}
-          <div className="lg:col-span-3">
-            {activeSection === "profile" && (
-              <ProfileSection
-                userProfile={userProfile}
-                setUserProfile={setUserProfile}
-                isEditing={isEditing}
-                setIsEditing={setIsEditing}
-                hasChanges={hasChanges}
-                setHasChanges={setHasChanges}
-                onSave={saveChanges}
-                onCancel={cancelChanges}
-              />
-            )}
-            {activeSection === "account" && <AccountSection />}
-            {activeSection === "notifications" && <NotificationsSection />}
-            <div style={{ display: "none" }}>
-              {activeSection === "security" && <SecuritySection />}
-              {activeSection === "payment" && (
-                <PaymentSection userRole={userRole} />
-              )}
-              {activeSection === "subscription" && <SubscriptionSection />}
-            </div>
-          </div>
         </div>
-      </div>
-    </DashboardLayout>
+      </DashboardLayout>
+    </AuthWrapper>
   );
 }
 
@@ -423,20 +482,60 @@ function DesignerAdditionalInfo({
               <span className="label-text font-medium">포트폴리오 링크</span>
             </label>
             <div className="space-y-2">
-              <input
-                type="url"
-                className="input input-bordered w-full"
-                placeholder="https://behance.net/yourprofile"
-                disabled={!isEditing}
-              />
-              <input
-                type="url"
-                className="input input-bordered w-full"
-                placeholder="https://dribbble.com/yourprofile"
-                disabled={!isEditing}
-              />
+              {userProfile.portfolioLinks?.map((link, index) => (
+                <div key={index} className="flex gap-2">
+                  <input
+                    type="url"
+                    className="input input-bordered w-full"
+                    value={link}
+                    onChange={(e) => {
+                      const newLinks = [...(userProfile.portfolioLinks || [])];
+                      newLinks[index] = e.target.value;
+                      updateProfile("portfolioLinks", newLinks);
+                    }}
+                    disabled={!isEditing}
+                    placeholder="https://portfolio.example.com"
+                  />
+                  {isEditing && (
+                    <button
+                      className="btn btn-ghost btn-sm text-error"
+                      onClick={() => {
+                        const newLinks = userProfile.portfolioLinks?.filter(
+                          (_, i) => i !== index
+                        );
+                        updateProfile("portfolioLinks", newLinks);
+                      }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              )) || (
+                <>
+                  <input
+                    type="url"
+                    className="input input-bordered w-full"
+                    placeholder="https://behance.net/yourprofile"
+                    disabled={!isEditing}
+                  />
+                  <input
+                    type="url"
+                    className="input input-bordered w-full"
+                    placeholder="https://dribbble.com/yourprofile"
+                    disabled={!isEditing}
+                  />
+                </>
+              )}
               {isEditing && (
-                <button className="btn btn-outline btn-sm">+ 링크 추가</button>
+                <button
+                  className="btn btn-outline btn-sm"
+                  onClick={() => {
+                    const currentLinks = userProfile.portfolioLinks || [];
+                    updateProfile("portfolioLinks", [...currentLinks, ""]);
+                  }}
+                >
+                  + 링크 추가
+                </button>
               )}
             </div>
           </div>
@@ -455,36 +554,48 @@ function DesignerAdditionalInfo({
             />
           </div>
 
-          {/* 평균 요율 */}
+          {/* 시간당 단가 */}
           <div className="form-control w-full">
             <label className="label pb-1">
               <span className="label-text font-medium">
-                평균 요율 (선택사항)
+                시간당 단가 (선택사항)
               </span>
             </label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="join">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+              <div className="relative">
                 <input
                   type="number"
-                  className="input input-bordered join-item flex-1"
-                  placeholder="시간당 요율"
+                  className="input input-bordered w-full pr-16"
+                  placeholder="예: 50000"
                   value={userProfile.hourlyRate || ""}
                   onChange={(e) =>
                     updateProfile("hourlyRate", Number(e.target.value))
                   }
                   disabled={!isEditing}
                 />
-                <span className="btn btn-outline join-item">원/시간</span>
+                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-base-content/60 text-sm">
+                  원/시간
+                </span>
               </div>
               <div className="form-control">
-                <label className="label cursor-pointer gap-2">
-                  <span className="label-text text-sm">요율 공개</span>
+                <div className="flex items-center gap-2">
+                  <span className="label-text text-sm">단가 공개</span>
                   <input
                     type="checkbox"
                     className="toggle toggle-primary"
+                    checked={userProfile.rateVisible || false}
+                    onChange={(e) => {
+                      console.log(
+                        "토글 클릭:",
+                        e.target.checked,
+                        "편집모드:",
+                        isEditing
+                      );
+                      updateProfile("rateVisible", e.target.checked);
+                    }}
                     disabled={!isEditing}
                   />
-                </label>
+                </div>
               </div>
             </div>
           </div>
@@ -650,22 +761,39 @@ function AccountSection() {
 
 // 알림 설정 섹션
 function NotificationsSection() {
-  const [notifications, setNotifications] = useState({
-    email: true,
-    push: true,
-    sms: false,
-    newMessage: true,
-    reportUpload: true,
-    feedbackRequest: true,
-    modificationComplete: true,
-    scheduleChange: true,
-    deadlineReminder: true,
-    paymentNotification: true,
-    serviceUpdates: false,
-  });
+  const [notifications, setNotifications] = useState<NotificationSettingsType>(
+    NotificationSettings.getSettings()
+  );
+  const [browserPermission, setBrowserPermission] =
+    useState<NotificationPermission>("default");
 
-  const updateNotification = (key: string, value: boolean) => {
-    setNotifications((prev) => ({ ...prev, [key]: value }));
+  useEffect(() => {
+    setBrowserPermission(getNotificationPermission());
+  }, []);
+
+  const updateNotification = (
+    key: keyof NotificationSettingsType,
+    value: any
+  ) => {
+    const updated = { ...notifications, [key]: value };
+    setNotifications(updated);
+    NotificationSettings.saveSettings(updated);
+  };
+
+  const handlePushToggle = async () => {
+    if (!notifications.pushEnabled) {
+      const granted = await requestNotificationPermission();
+      if (granted) {
+        updateNotification("pushEnabled", true);
+        setBrowserPermission("granted");
+      } else {
+        alert(
+          "브라우저에서 알림 권한을 허용해야 푸시 알림을 받을 수 있습니다."
+        );
+      }
+    } else {
+      updateNotification("pushEnabled", false);
+    }
   };
 
   return (
@@ -680,45 +808,64 @@ function NotificationsSection() {
               <div className="card-body">
                 <h3 className="font-bold mb-4">알림 수신 방식</h3>
                 <div className="space-y-3">
+                  {/* 이메일 알림 (향후 지원 예정) - UI 비노출 */}
+                  {false && (
+                    <div className="form-control">
+                      <label className="label cursor-pointer justify-between w-full">
+                        <span className="label-text">📧 이메일 알림</span>
+                        <input
+                          type="checkbox"
+                          className="toggle toggle-primary"
+                          checked={notifications.emailEnabled}
+                          onChange={(e) =>
+                            updateNotification("emailEnabled", e.target.checked)
+                          }
+                        />
+                      </label>
+                    </div>
+                  )}
                   <div className="form-control">
                     <label className="label cursor-pointer justify-between w-full">
-                      <span className="label-text">📧 이메일 알림</span>
+                      <div className="flex flex-col items-start">
+                        <span className="label-text">🔔 앱 푸시 알림</span>
+                        <span className="text-xs text-base-content/60">
+                          {browserPermission === "granted"
+                            ? "✅ 브라우저 권한 허용됨"
+                            : browserPermission === "denied"
+                            ? "❌ 브라우저 권한 거부됨"
+                            : "⏳ 브라우저 권한 필요"}
+                        </span>
+                      </div>
                       <input
                         type="checkbox"
                         className="toggle toggle-primary"
-                        checked={notifications.email}
-                        onChange={(e) =>
-                          updateNotification("email", e.target.checked)
-                        }
+                        checked={notifications.pushEnabled}
+                        onChange={handlePushToggle}
+                        disabled={browserPermission === "denied"}
                       />
                     </label>
+                    {browserPermission === "denied" && (
+                      <div className="text-xs text-warning mt-1 ml-4">
+                        브라우저 설정에서 알림 권한을 허용해주세요
+                      </div>
+                    )}
                   </div>
-                  <div className="form-control">
-                    <label className="label cursor-pointer justify-between w-full">
-                      <span className="label-text">🔔 앱 푸시 알림</span>
-                      <input
-                        type="checkbox"
-                        className="toggle toggle-primary"
-                        checked={notifications.push}
-                        onChange={(e) =>
-                          updateNotification("push", e.target.checked)
-                        }
-                      />
-                    </label>
-                  </div>
-                  <div className="form-control">
-                    <label className="label cursor-pointer justify-between w-full">
-                      <span className="label-text">📱 SMS 알림</span>
-                      <input
-                        type="checkbox"
-                        className="toggle toggle-primary"
-                        checked={notifications.sms}
-                        onChange={(e) =>
-                          updateNotification("sms", e.target.checked)
-                        }
-                      />
-                    </label>
-                  </div>
+                  {/* SMS 알림 (향후 지원 예정) - UI 비노출 */}
+                  {false && (
+                    <div className="form-control">
+                      <label className="label cursor-pointer justify-between w-full">
+                        <span className="label-text">📱 SMS 알림</span>
+                        <input
+                          type="checkbox"
+                          className="toggle toggle-primary"
+                          checked={notifications.toastEnabled}
+                          onChange={(e) =>
+                            updateNotification("toastEnabled", e.target.checked)
+                          }
+                        />
+                      </label>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -734,9 +881,12 @@ function NotificationsSection() {
                       <input
                         type="checkbox"
                         className="toggle toggle-primary"
-                        checked={notifications.newMessage}
+                        checked={notifications.messageNotifications}
                         onChange={(e) =>
-                          updateNotification("newMessage", e.target.checked)
+                          updateNotification(
+                            "messageNotifications",
+                            e.target.checked
+                          )
                         }
                       />
                     </label>
@@ -747,9 +897,12 @@ function NotificationsSection() {
                       <input
                         type="checkbox"
                         className="toggle toggle-primary"
-                        checked={notifications.reportUpload}
+                        checked={notifications.statusChangeNotifications}
                         onChange={(e) =>
-                          updateNotification("reportUpload", e.target.checked)
+                          updateNotification(
+                            "statusChangeNotifications",
+                            e.target.checked
+                          )
                         }
                       />
                     </label>
@@ -760,10 +913,10 @@ function NotificationsSection() {
                       <input
                         type="checkbox"
                         className="toggle toggle-primary"
-                        checked={notifications.feedbackRequest}
+                        checked={notifications.feedbackNotifications}
                         onChange={(e) =>
                           updateNotification(
-                            "feedbackRequest",
+                            "feedbackNotifications",
                             e.target.checked
                           )
                         }
@@ -776,10 +929,10 @@ function NotificationsSection() {
                       <input
                         type="checkbox"
                         className="toggle toggle-primary"
-                        checked={notifications.modificationComplete}
+                        checked={notifications.completionNotifications}
                         onChange={(e) =>
                           updateNotification(
-                            "modificationComplete",
+                            "completionNotifications",
                             e.target.checked
                           )
                         }
@@ -792,9 +945,12 @@ function NotificationsSection() {
                       <input
                         type="checkbox"
                         className="toggle toggle-primary"
-                        checked={notifications.scheduleChange}
+                        checked={notifications.statusChangeNotifications}
                         onChange={(e) =>
-                          updateNotification("scheduleChange", e.target.checked)
+                          updateNotification(
+                            "statusChangeNotifications",
+                            e.target.checked
+                          )
                         }
                       />
                     </label>
@@ -805,10 +961,10 @@ function NotificationsSection() {
                       <input
                         type="checkbox"
                         className="toggle toggle-primary"
-                        checked={notifications.deadlineReminder}
+                        checked={notifications.deadlineNotifications}
                         onChange={(e) =>
                           updateNotification(
-                            "deadlineReminder",
+                            "deadlineNotifications",
                             e.target.checked
                           )
                         }
@@ -821,12 +977,9 @@ function NotificationsSection() {
                       <input
                         type="checkbox"
                         className="toggle toggle-primary"
-                        checked={notifications.paymentNotification}
+                        checked={notifications.toastEnabled}
                         onChange={(e) =>
-                          updateNotification(
-                            "paymentNotification",
-                            e.target.checked
-                          )
+                          updateNotification("toastEnabled", e.target.checked)
                         }
                       />
                     </label>
@@ -839,9 +992,9 @@ function NotificationsSection() {
                       <input
                         type="checkbox"
                         className="toggle toggle-primary"
-                        checked={notifications.serviceUpdates}
+                        checked={notifications.sound}
                         onChange={(e) =>
-                          updateNotification("serviceUpdates", e.target.checked)
+                          updateNotification("sound", e.target.checked)
                         }
                       />
                     </label>
@@ -850,24 +1003,66 @@ function NotificationsSection() {
               </div>
             </div>
 
-            {/* 마감일 알림 설정 */}
+            {/* 조용한 시간 설정 */}
             <div className="card bg-base-50">
               <div className="card-body">
-                <h3 className="font-bold mb-4">마감일 알림 설정</h3>
-                <div className="form-control w-full">
-                  <label className="label pb-1">
-                    <span className="label-text">
-                      마감일 며칠 전에 알림을 받으시겠습니까?
-                    </span>
+                <h3 className="font-bold mb-4">조용한 시간</h3>
+                <div className="form-control mb-4">
+                  <label className="label cursor-pointer justify-between w-full">
+                    <span className="label-text">조용한 시간 활성화</span>
+                    <input
+                      type="checkbox"
+                      className="toggle toggle-primary"
+                      checked={notifications.quietHours.enabled}
+                      onChange={(e) =>
+                        updateNotification("quietHours", {
+                          ...notifications.quietHours,
+                          enabled: e.target.checked,
+                        })
+                      }
+                    />
                   </label>
-                  <select className="select select-bordered w-full">
-                    <option>1일 전</option>
-                    <option>2일 전</option>
-                    <option selected>3일 전</option>
-                    <option>5일 전</option>
-                    <option>7일 전</option>
-                  </select>
+                  <div className="text-xs text-base-content/60 mt-1">
+                    지정한 시간 동안은 푸시 알림을 받지 않습니다
+                  </div>
                 </div>
+
+                {notifications.quietHours.enabled && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="form-control">
+                      <label className="label pb-1">
+                        <span className="label-text">시작 시간</span>
+                      </label>
+                      <input
+                        type="time"
+                        className="input input-bordered"
+                        value={notifications.quietHours.start}
+                        onChange={(e) =>
+                          updateNotification("quietHours", {
+                            ...notifications.quietHours,
+                            start: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="form-control">
+                      <label className="label pb-1">
+                        <span className="label-text">종료 시간</span>
+                      </label>
+                      <input
+                        type="time"
+                        className="input input-bordered"
+                        value={notifications.quietHours.end}
+                        onChange={(e) =>
+                          updateNotification("quietHours", {
+                            ...notifications.quietHours,
+                            end: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

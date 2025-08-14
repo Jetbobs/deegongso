@@ -14,23 +14,15 @@ const Sidebar = ({ userRole, isOpen, onClose }: SidebarProps) => {
   const pathname = usePathname();
 
   // 역할별 네비게이션 메뉴
-  const getNavigationItems = (role: UserRole): NavigationItem[] => {
-    const commonItems: NavigationItem[] = [
+  const getNavigationItems = (_role: UserRole): NavigationItem[] => {
+    const items: NavigationItem[] = [
       { label: "대시보드", href: "/dashboard", icon: "🏠" },
       { label: "내 프로젝트", href: "/projects", icon: "📁" },
+      { label: "계약 관리", href: "/contracts", icon: "📋" },
       { label: "메시지", href: "/messages", icon: "💬", badge: 3 },
       { label: "설정", href: "/settings", icon: "⚙️" },
     ];
-
-    if (role === "designer") {
-      return [
-        ...commonItems.slice(0, 2),
-        { label: "계약 관리", href: "/contracts", icon: "📋" },
-        ...commonItems.slice(2),
-      ];
-    }
-
-    return commonItems;
+    return items;
   };
 
   const navigationItems = getNavigationItems(userRole);
@@ -48,9 +40,9 @@ const Sidebar = ({ userRole, isOpen, onClose }: SidebarProps) => {
       {/* 사이드바 */}
       <div
         className={`
-        fixed top-0 left-0 z-50 h-screen w-64 bg-base-100 border-r border-base-300
+        fixed top-0 left-0 z-50 h-screen w-64 sm:w-72 bg-base-100 border-r border-base-300
         transform transition-transform duration-300 ease-in-out
-        lg:translate-x-0
+        lg:translate-x-0 lg:w-64
         ${isOpen ? "translate-x-0" : "-translate-x-full"}
       `}
       >
@@ -81,11 +73,11 @@ const Sidebar = ({ userRole, isOpen, onClose }: SidebarProps) => {
                   <Link
                     href={item.href}
                     className={`
-                      flex items-center justify-between p-3 rounded-lg transition-colors
+                      flex items-center justify-between p-3 rounded-lg transition-colors touch-manipulation
                       ${
                         isActive
                           ? "bg-primary text-primary-content"
-                          : "hover:bg-base-200"
+                          : "hover:bg-base-200 active:bg-base-200"
                       }
                     `}
                     onClick={onClose}

@@ -18,6 +18,7 @@ export interface ClientUser extends BaseUser {
   role: "client";
   company?: string;
   department?: string;
+  title?: string; // 직책
 }
 
 // 디자이너 사용자 정보
@@ -26,6 +27,7 @@ export interface DesignerUser extends BaseUser {
   experience?: string;
   specialization?: string[];
   portfolio_url?: string;
+  strengths?: string[]; // 강점
 }
 
 // 유니온 타입
@@ -33,6 +35,8 @@ export type User = ClientUser | DesignerUser;
 
 // 프로젝트 관련 타입
 export type ProjectStatus =
+  | "creation_pending" // 프로젝트 생성 승인 대기 중
+  | "review_requested" // 검토 요청 중 (제출 후 승인/검토 대기)
   | "client_review_pending" // 클라이언트 검토 대기 중
   | "designer_review_pending" // 디자이너 검토 대기 중
   | "in_progress" // 진행 중
@@ -62,6 +66,10 @@ export interface Project {
   estimated_price: number;
   total_modification_count: number;
   remaining_modification_count: number;
+
+  // 예산 관련
+  budget_used: number; // 사용된 예산 (실제 작업 시간 * 시간당 요금 등)
+  additional_costs?: ProjectCost[]; // 추가 비용 항목들
 
   // 요구사항 및 자료
   requirements: string;
@@ -100,10 +108,58 @@ export interface Feedback {
   project_id: string;
   report_id: string;
   content: string;
-  attachments?: string[];
+  content_html: string; // 리치 텍스트 HTML
+  attachments?: FeedbackAttachment[];
+  annotations?: FeedbackAnnotation[];
   is_official: boolean; // 공식 피드백 여부 (수정 횟수 차감)
+  priority: "low" | "medium" | "high" | "critical";
+  category: "design" | "content" | "functionality" | "technical" | "other";
+  status: "pending" | "acknowledged" | "in_progress" | "resolved" | "rejected";
   submitted_at: string;
+  updated_at: string;
+  resolved_at?: string;
   client_id: string;
+  version: number; // 피드백 버전
+  parent_feedback_id?: string; // 답글인 경우 부모 피드백 ID
+  revision_request_count: number; // 이 피드백으로 인한 수정 요청 횟수
+}
+
+// 피드백 첨부파일
+export interface FeedbackAttachment {
+  id: string;
+  feedback_id: string;
+  file_name: string;
+  file_url: string;
+  file_type: string;
+  file_size: number;
+  thumbnail_url?: string;
+  uploaded_at: string;
+}
+
+// 피드백 주석 (이미지나 파일에 대한 주석)
+export interface FeedbackAnnotation {
+  id: string;
+  feedback_id: string;
+  target_file_id: string; // 주석 대상 파일 ID
+  annotation_type: "point" | "area" | "text";
+  position_x: number;
+  position_y: number;
+  width?: number;
+  height?: number;
+  content: string;
+  created_at: string;
+}
+
+// 피드백 템플릿
+export interface FeedbackTemplate {
+  id: string;
+  name: string;
+  description: string;
+  content_template: string;
+  category: string;
+  is_system: boolean;
+  created_by: string;
+  created_at: string;
 }
 
 // 댓글 관련 타입
@@ -160,11 +216,31 @@ export interface CompletionRequest {
   response_note?: string; // 클라이언트의 응답 메모
 }
 
+// 프로젝트 비용 항목
+export interface ProjectCost {
+  id: string;
+  project_id: string;
+  description: string;
+  amount: number;
+  cost_type: "base_fee" | "modification_fee" | "rush_fee" | "additional_work" | "other";
+  created_at: string;
+}
+
 // API 응답 타입
 export interface ApiResponse<T> {
   data?: T;
   error?: string;
   message?: string;
+}
+
+// 알림 타입
+export interface NotificationItem {
+  id: string;
+  user_id: string;
+  message: string;
+  is_read: boolean;
+  created_at: string; // ISO string
+  url: string;
 }
 
 // 네비게이션 관련 타입

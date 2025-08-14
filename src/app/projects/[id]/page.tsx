@@ -1,1556 +1,1605 @@
 "use client";
 
-import { useState } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Project, CompletionRequest, ProjectReview } from "@/types";
+import AuthWrapper from "@/components/auth/AuthWrapper";
+import { Project, Feedback, UserRole } from "@/types";
+import { ProjectWorkflowManager } from "@/lib/projectWorkflow";
+import { FeedbackVersionManager } from "@/lib/feedbackVersionManager";
+import FeedbackForm from "@/components/feedback/FeedbackForm";
+import FeedbackList from "@/components/feedback/FeedbackList";
+import FeedbackVersionHistory from "@/components/feedback/FeedbackVersionHistory";
+import ImageAnnotation from "@/components/feedback/ImageAnnotation";
+import FileUpload, { UploadedFile } from "@/components/ui/FileUpload";
+import { addNotification } from "@/lib/notifications";
 
-// 수정 요청 타입 정의
-interface ModificationItem {
-  id: string;
-  content: string;
-  attachments?: string[];
-  status: "pending" | "in_progress" | "completed" | "needs_discussion";
-  designerComment?: string;
-  createdAt: string;
-}
-
-interface FeedbackBatch {
-  id: string;
-  reportId: string;
-  items: ModificationItem[];
-  submittedAt: string;
-  status: "pending" | "in_progress" | "completed";
-}
-
-// 임시 데이터 (나중에 API로 대체)
-const mockProject: Project = {
+const MOCK_PROJECT: Project = {
   id: "1",
   name: "로고 디자인 프로젝트",
   description: "브랜드 아이덴티티를 위한 로고 디자인 및 가이드라인 제작",
   status: "feedback_period",
-  client_id: "client-1",
-  designer_id: "designer-1",
+  client_id: "1",
+  designer_id: "2",
   start_date: "2024-01-15",
   end_date: "2024-02-15",
   draft_deadline: "2024-01-25",
   first_review_deadline: "2024-02-05",
   final_review_deadline: "2024-02-12",
   estimated_price: 2500000,
+  budget_used: 1850000,
   total_modification_count: 3,
   remaining_modification_count: 1,
-  requirements:
-    "모던하고 미니멀한 스타일의 로고를 원합니다. 브랜드 컬러는 블루 계열을 선호하며, 다양한 매체에서 활용 가능한 확장성을 고려해주세요.",
-  attached_files: ["reference1.jpg", "brand_guidelines.pdf"],
-  contract_file: "contract_signed.pdf",
+  requirements: "모던하고 미니멀한 스타일의 로고를 원합니다.",
   created_at: "2024-01-15T09:00:00Z",
   updated_at: "2024-01-20T14:30:00Z",
 };
 
-type TabType = "overview" | "reports" | "timeline";
+const MOCK_FEEDBACKS: Feedback[] = [
+  {
+    id: "feedback-1",
+    project_id: "1",
+    report_id: "report-1",
+    content: "로고의 색상을 좀 더 밝게 조정해주세요. 현재는 너무 어둡습니다.",
+    content_html:
+      "<p>로고의 색상을 좀 더 <strong>밝게 조정</strong>해주세요. 현재는 너무 어둡습니다.</p>",
+    priority: "high",
+    category: "design",
+    status: "pending",
+    is_official: true,
+    submitted_at: "2024-01-22T10:30:00Z",
+    updated_at: "2024-01-22T10:30:00Z",
+    client_id: "1",
+    version: 1,
+    revision_request_count: 0,
+  },
+  {
+    id: "feedback-2",
+    project_id: "1",
+    report_id: "report-1",
+    content: "폰트가 너무 두꺼워 보입니다.",
+    content_html:
+      "<p>폰트가 너무 <em>두꺼워</em> 보입니다. 좀 더 세련된 느낌으로 수정 가능할까요?</p>",
+    priority: "medium",
+    category: "design",
+    status: "acknowledged",
+    is_official: false,
+    submitted_at: "2024-01-22T11:00:00Z",
+    updated_at: "2024-01-22T11:15:00Z",
+    client_id: "1",
+    version: 1,
+    revision_request_count: 0,
+  },
+];
 
-export default function ProjectDetailPage() {
+export default function EnhancedProjectDetailPage() {
   const params = useParams();
-  const projectId = params.id as string;
-  const [activeTab, setActiveTab] = useState<TabType>("overview");
-  const [showModificationModal, setShowModificationModal] = useState(false);
-  const [showCompletionModal, setShowCompletionModal] = useState(false);
-  const [showDeliverableModal, setShowDeliverableModal] = useState(false);
-  const [showReviewModal, setShowReviewModal] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { user } = useAuth();
 
-  // 임시로 클라이언트 역할 (실제로는 인증된 사용자 정보에서 가져올 것)
-  const userRole = "client" as "client" | "designer";
+  const projectId = params?.id as string;
+  const userRole: UserRole = user?.role ?? user?.userType ?? "client";
 
-  // 실제로는 projectId로 API 호출하여 프로젝트 데이터를 가져올 것
-  const project = mockProject;
-
-  // 진행률 계산
-  const calculateProgress = () => {
-    const total = 100;
-    switch (project.status) {
-      case "client_review_pending":
-      case "designer_review_pending":
-        return 10;
-      case "in_progress":
-        return 30;
-      case "feedback_period":
-        return 70;
-      case "modification_in_progress":
-        return 75;
-      case "completion_requested":
-        return 90;
-      case "completed":
-      case "archived":
-        return 100;
-      default:
-        return 0;
+  const [project, setProject] = useState<Project>(MOCK_PROJECT);
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>(MOCK_FEEDBACKS);
+  const [activeTab, setActiveTab] = useState<string>(
+    searchParams.get("tab") || "overview"
+  );
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [editingFeedback, setEditingFeedback] = useState<Feedback | null>(null);
+  
+  // 파일 업로드 상태
+  const [uploadingStage, setUploadingStage] = useState<string | null>(null);
+  const [draftFiles, setDraftFiles] = useState<File[]>([]);
+  const [intermediateFiles, setIntermediateFiles] = useState<File[]>([]);
+  const [finalFiles, setFinalFiles] = useState<File[]>([]);
+  
+  // 갤러리 뷰 상태
+  const [showAllDrafts, setShowAllDrafts] = useState(false);
+  const [showAllIntermediate, setShowAllIntermediate] = useState(false);
+  const [showAllFinal, setShowAllFinal] = useState(false);
+  
+  // 모달 상태
+  const [selectedImage, setSelectedImage] = useState<{
+    src: string;
+    alt: string;
+    title?: string;
+    description?: string;
+  } | null>(null);
+  
+  // 파일 필터링 상태
+  const [fileSearchTerm, setFileSearchTerm] = useState('');
+  const [selectedFileCategory, setSelectedFileCategory] = useState('all');
+  const [fileSortBy, setFileSortBy] = useState('date'); // date, name, size
+  
+  // 업로드 메타데이터 상태
+  const [uploadMetadata, setUploadMetadata] = useState<{
+    [stage: string]: {
+      title: string;
+      description: string;
+      fileType: string;
     }
-  };
+  }>({
+    draft: { title: '', description: '', fileType: 'general' },
+    intermediate: { title: '', description: '', fileType: 'general' },
+    final: { title: '', description: '', fileType: 'general' },
+  });
+  // 모의 디자인 초안 파일들 (많은 파일 시나리오)
+  const mockDraftFiles = Array.from({ length: 15 }, (_, i) => ({
+    id: `draft-${i + 1}`,
+    name: `logo_design_v${i + 1}.png`,
+    preview: `https://picsum.photos/400/300?random=${i + 10}`,
+    uploadDate: new Date(2024, 0, 15 + i).toLocaleDateString(),
+    size: Math.floor(Math.random() * 5000) + 1000 // KB
+  }));
 
-  const getStatusText = (status: string) => {
-    const statusMap: Record<string, string> = {
-      client_review_pending: "클라이언트 검토 대기",
-      designer_review_pending: "디자이너 검토 대기",
-      in_progress: "진행 중",
-      feedback_period: "피드백 정리 기간",
-      modification_in_progress: "수정 작업 중",
-      completion_requested: "완료 승인 대기",
-      completed: "완료",
-      archived: "아카이브됨",
-      cancelled: "취소",
-    };
-    return statusMap[status] || status;
-  };
+  const mockIntermediateFiles = Array.from({ length: 25 }, (_, i) => ({
+    id: `intermediate-${i + 1}`,
+    name: i < 8 ? `business_card_v${i + 1}.png` : 
+          i < 16 ? `letterhead_v${i - 7}.pdf` : 
+          `brochure_v${i - 15}.png`,
+    preview: i < 16 ? `https://picsum.photos/400/300?random=${i + 50}` : null,
+    uploadDate: new Date(2024, 0, 25 + i).toLocaleDateString(),
+    size: Math.floor(Math.random() * 8000) + 2000,
+    type: i < 8 ? '명함' : i < 16 ? '레터헤드' : '브로셔'
+  }));
 
-  const getStatusBadgeClass = (status: string) => {
-    const statusMap: Record<string, string> = {
-      client_review_pending: "badge-warning",
-      designer_review_pending: "badge-info",
-      in_progress: "badge-primary",
-      feedback_period: "badge-accent",
-      modification_in_progress: "badge-secondary",
-      completion_requested: "badge-warning",
-      completed: "badge-success",
-      archived: "badge-neutral",
-      cancelled: "badge-error",
-    };
-    return statusMap[status] || "badge-neutral";
-  };
-
-  const progress = calculateProgress();
-
-  return (
-    <DashboardLayout title={`프로젝트: ${project.name}`} userRole={userRole}>
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* 상단 요약 섹션 (Header Summary) */}
-        <div className="card bg-base-100 shadow-lg">
-          <div className="card-body p-8">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-              {/* 좌측: 프로젝트 기본 정보 */}
-              <div className="flex-1">
-                <div className="flex items-center gap-4 mb-4">
-                  <h1 className="text-3xl font-bold text-base-content">
-                    {project.name}
-                  </h1>
-                  <span
-                    className={`badge badge-lg ${getStatusBadgeClass(
-                      project.status
-                    )}`}
-                  >
-                    {getStatusText(project.status)}
-                  </span>
-                </div>
-
-                {/* 전체 진행률 */}
-                <div className="mb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium">전체 진행률</span>
-                    <span className="text-sm font-bold">{progress}%</span>
-                  </div>
-                  <progress
-                    className="progress progress-primary w-full h-3"
-                    value={progress}
-                    max="100"
-                  ></progress>
-                </div>
-
-                {/* 핵심 지표들 */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <span className="text-base-content/60">다음 마감일</span>
-                    <div className="font-bold text-error">
-                      1월 25일 (5일 남음)
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-base-content/60">수정 횟수</span>
-                    <div className="font-bold text-warning">
-                      사용:{" "}
-                      {project.total_modification_count -
-                        project.remaining_modification_count}
-                      /{project.total_modification_count}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-base-content/60">예상 견적</span>
-                    <div className="font-bold">
-                      {project.estimated_price.toLocaleString()}원
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-base-content/60">프로젝트 기간</span>
-                    <div className="font-bold">
-                      {project.start_date} ~ {project.end_date}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 우측: 주요 액션 버튼들 */}
-              <div className="flex flex-col gap-3 lg:min-w-[200px]">
-                {project.status === "feedback_period" &&
-                  userRole === "client" && (
-                    <button className="btn btn-outline">📋 보고물 확인</button>
-                  )}
-                {project.status === "in_progress" &&
-                  userRole === "designer" && (
-                    <>
-                      <button className="btn btn-primary btn-lg">
-                        📤 보고물 업로드
-                      </button>
-                      <button className="btn btn-outline">
-                        📅 일정 수정 요청
-                      </button>
-                    </>
-                  )}
-
-                {/* 완료 요청 버튼 (디자이너) */}
-                {(project.status === "feedback_period" ||
-                  project.status === "modification_in_progress") &&
-                  userRole === "designer" && (
-                    <button
-                      className="btn btn-success btn-lg"
-                      onClick={() => setShowCompletionModal(true)}
-                    >
-                      ✅ 프로젝트 완료 요청
-                    </button>
-                  )}
-
-                {/* 최종 승인 버튼 (클라이언트) */}
-                {project.status === "completion_requested" &&
-                  userRole === "client" && (
-                    <>
-                      <button
-                        className="btn btn-warning btn-lg"
-                        onClick={() => setShowDeliverableModal(true)}
-                      >
-                        📋 최종 산출물 확인
-                      </button>
-                      <button className="btn btn-success btn-lg">
-                        ✅ 최종 승인 및 완료
-                      </button>
-                    </>
-                  )}
-
-                {/* 완료된 프로젝트 액션들 */}
-                {project.status === "completed" && (
-                  <>
-                    <button
-                      className="btn btn-primary btn-lg"
-                      onClick={() => setShowDeliverableModal(true)}
-                    >
-                      📁 최종 산출물 다운로드
-                    </button>
-                    <button
-                      className="btn btn-outline"
-                      onClick={() => setShowReviewModal(true)}
-                    >
-                      ⭐ 리뷰 작성
-                    </button>
-                    <button className="btn btn-ghost btn-sm">
-                      📦 아카이브
-                    </button>
-                  </>
-                )}
-
-                <button className="btn btn-ghost">💬 메시지 보내기</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 탭 네비게이션 */}
-        <div className="tabs tabs-bordered bg-base-100 rounded-lg p-2">
-          <button
-            className={`tab tab-lg flex-1 ${
-              activeTab === "overview" ? "tab-active" : ""
-            }`}
-            onClick={() => setActiveTab("overview")}
-          >
-            📋 개요
-          </button>
-          <button
-            className={`tab tab-lg flex-1 ${
-              activeTab === "reports" ? "tab-active" : ""
-            }`}
-            onClick={() => setActiveTab("reports")}
-          >
-            📝 보고 및 피드백
-          </button>
-          <button
-            className={`tab tab-lg flex-1 ${
-              activeTab === "timeline" ? "tab-active" : ""
-            }`}
-            onClick={() => setActiveTab("timeline")}
-          >
-            📅 타임라인
-          </button>
-        </div>
-
-        {/* 탭 콘텐츠 */}
-        <div className="min-h-[600px]">
-          {activeTab === "overview" && <OverviewTab project={project} />}
-          {activeTab === "reports" && (
-            <ReportsAndFeedbackTab
-              project={project}
-              userRole={userRole}
-              onOpenModal={() => setShowModificationModal(true)}
-            />
-          )}
-          {activeTab === "timeline" && <TimelineTab project={project} />}
-        </div>
-      </div>
-
-      {/* 수정 체크리스트 모달 */}
-      {showModificationModal && (
-        <ModificationChecklistModal
-          project={project}
-          userRole={userRole}
-          onClose={() => setShowModificationModal(false)}
-        />
-      )}
-
-      {/* 프로젝트 완료 요청 모달 */}
-      {showCompletionModal && (
-        <CompletionRequestModal
-          project={project}
-          onClose={() => setShowCompletionModal(false)}
-        />
-      )}
-
-      {/* 최종 산출물 확인/다운로드 모달 */}
-      {showDeliverableModal && (
-        <FinalDeliverableModal
-          project={project}
-          userRole={userRole}
-          onClose={() => setShowDeliverableModal(false)}
-        />
-      )}
-
-      {/* 리뷰 작성 모달 */}
-      {showReviewModal && (
-        <ReviewModal
-          project={project}
-          userRole={userRole}
-          onClose={() => setShowReviewModal(false)}
-        />
-      )}
-    </DashboardLayout>
-  );
-}
-
-// 개요 탭 컴포넌트
-function OverviewTab({ project }: { project: Project }) {
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* 프로젝트 정보 */}
-      <div className="card bg-base-100 shadow-sm">
-        <div className="card-body">
-          <h3 className="card-title text-lg mb-4">프로젝트 정보</h3>
-
-          <div className="space-y-4">
-            <div>
-              <h4 className="font-semibold mb-2">프로젝트 목표 및 요구사항</h4>
-              <div className="collapse collapse-arrow bg-base-200">
-                <input type="checkbox" />
-                <div className="collapse-title text-sm font-medium">
-                  상세 요구사항 보기
-                </div>
-                <div className="collapse-content">
-                  <p className="text-sm">{project.requirements}</p>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="font-semibold mb-2">전달 자료</h4>
-              <div className="space-y-2">
-                {project.attached_files?.map((file, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-2 bg-base-200 rounded"
-                  >
-                    <span className="text-sm">📎 {file}</span>
-                    <button className="btn btn-xs btn-outline">다운로드</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <h4 className="font-semibold mb-2">담당자 정보</h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <div className="text-base-content/60">클라이언트</div>
-                  <div className="font-medium">홍길동</div>
-                  <div className="text-xs">hong@company.com</div>
-                </div>
-                <div>
-                  <div className="text-base-content/60">디자이너</div>
-                  <div className="font-medium">김디자이너</div>
-                  <div className="text-xs">designer@studio.com</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 계약서 및 결제 정보 */}
-      <div className="space-y-6">
-        {/* 계약서 섹션 */}
-        <div className="card bg-base-100 shadow-sm">
-          <div className="card-body">
-            <h3 className="card-title text-lg mb-4">계약서</h3>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium">계약서 상태</div>
-                  <span className="badge badge-success">서명 완료</span>
-                </div>
-                <button className="btn btn-outline btn-sm">
-                  📄 계약서 다운로드
-                </button>
-              </div>
-
-              <div className="divider"></div>
-
-              <div className="text-sm">
-                <div className="flex justify-between mb-2">
-                  <span>서명일:</span>
-                  <span>2024-01-15</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>계약 기간:</span>
-                  <span>
-                    {project.start_date} ~ {project.end_date}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 결제 현황 섹션 */}
-        <div className="card bg-base-100 shadow-sm">
-          <div className="card-body">
-            <h3 className="card-title text-lg mb-4">결제 현황</h3>
-
-            <div className="space-y-4">
-              <div className="bg-base-200 p-4 rounded-lg">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="font-medium">총 견적</span>
-                  <span className="text-lg font-bold">
-                    {project.estimated_price.toLocaleString()}원
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div className="font-medium">계약금 (50%)</div>
-                    <div className="text-sm text-base-content/60">
-                      프로젝트 시작 시
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bold text-success">
-                      {(project.estimated_price * 0.5).toLocaleString()}원
-                    </div>
-                    <span className="badge badge-success badge-sm">완료</span>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div className="font-medium">잔금 (50%)</div>
-                    <div className="text-sm text-base-content/60">
-                      프로젝트 완료 시
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bold">
-                      {(project.estimated_price * 0.5).toLocaleString()}원
-                    </div>
-                    <span className="badge badge-warning badge-sm">
-                      대기 중
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// 보고 및 피드백 탭 컴포넌트 (개선된 버전)
-function ReportsAndFeedbackTab({
-  project,
-  userRole,
-  onOpenModal,
-}: {
-  project: Project;
-  userRole: "client" | "designer";
-  onOpenModal: () => void;
-}) {
-  const [selectedReport, setSelectedReport] = useState<string>("draft");
-
-  const reports = [
+  // 모의 프로젝트 파일들 (실제 업로드된 파일들을 시뮬레이션)
+  const mockProjectFiles: UploadedFile[] = [
     {
-      id: "draft",
-      name: "초안",
-      submitted: true,
-      date: "2024-01-20",
-      version: "v1.0",
+      id: "file-1",
+      file: new File(["mock"], "logo_design_v1.png", { type: "image/png" }),
+      name: "logo_design_v1.png",
+      size: 2456789,
+      type: "image/png",
+      preview: "https://picsum.photos/400/300?random=1",
+      uploadProgress: 100,
+      uploadStatus: "completed" as const,
+      url: "#"
     },
     {
-      id: "first_review",
-      name: "1차 디테일 시안",
-      submitted: false,
-      date: "2024-02-05",
+      id: "file-2",
+      file: new File(["mock"], "logo_design_v2.png", { type: "image/png" }),
+      name: "logo_design_v2.png",
+      size: 2789123,
+      type: "image/png",
+      preview: "https://picsum.photos/400/300?random=2",
+      uploadProgress: 100,
+      uploadStatus: "completed" as const,
+      url: "#"
     },
     {
-      id: "final_review",
-      name: "최종 검토 시안",
-      submitted: false,
-      date: "2024-02-12",
-    },
-  ];
-
-  return (
-    <div className="space-y-6">
-      {/* 수정 횟수 카드 */}
-      <ModificationStatusCard
-        project={project}
-        userRole={userRole}
-        onOpenModal={onOpenModal}
-      />
-
-      {/* 깔끔한 보고물 뷰어 */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* 좌측: 보고물 목록 */}
-        <div className="lg:col-span-1">
-          <div className="card bg-base-100 shadow-sm">
-            <div className="card-body p-0">
-              <div className="p-4 border-b">
-                <h3 className="font-bold">보고물 목록</h3>
-                {project.status === "feedback_period" && (
-                  <div className="text-sm text-accent mt-2">
-                    ⏰ 피드백 수집 중: 23시간 45분 남음
-                  </div>
-                )}
-              </div>
-
-              <div className="max-h-[400px] overflow-y-auto">
-                {reports.map((report) => (
-                  <div
-                    key={report.id}
-                    className={`p-4 border-b cursor-pointer hover:bg-base-200 transition-colors ${
-                      selectedReport === report.id
-                        ? "bg-primary/10 border-l-4 border-l-primary"
-                        : ""
-                    }`}
-                    onClick={() => setSelectedReport(report.id)}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium">{report.name}</h4>
-                      {report.submitted ? (
-                        <span className="badge badge-success badge-sm">
-                          제출됨
-                        </span>
-                      ) : (
-                        <span className="badge badge-outline badge-sm">
-                          대기 중
-                        </span>
-                      )}
-                    </div>
-
-                    {report.submitted && (
-                      <div className="text-xs text-base-content/60">
-                        <div>제출일: {report.date}</div>
-                        <div>버전: {report.version}</div>
-                      </div>
-                    )}
-
-                    {!report.submitted && (
-                      <div className="text-xs text-base-content/60">
-                        마감일: {report.date}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* 피드백 제출 버튼 영역 */}
-              {reports.find((r) => r.id === selectedReport)?.submitted &&
-                userRole === "client" &&
-                project.remaining_modification_count > 0 && (
-                  <div className="p-4 border-t bg-base-50">
-                    <button
-                      className="btn btn-warning w-full"
-                      onClick={onOpenModal}
-                    >
-                      📝 수정 요청 작성
-                    </button>
-                    <div className="text-xs text-center mt-2 text-base-content/60">
-                      남은 수정 횟수: {project.remaining_modification_count}회
-                    </div>
-                  </div>
-                )}
-            </div>
-          </div>
-
-          {/* 공식 피드백 히스토리 */}
-          <div className="card bg-base-100 shadow-sm mt-4">
-            <div className="card-body">
-              <h3 className="font-bold mb-4">공식 피드백 히스토리</h3>
-              <div className="space-y-2">
-                <div
-                  className="p-3 bg-base-200 rounded-lg cursor-pointer hover:bg-base-300 transition-colors"
-                  onClick={onOpenModal}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-sm">피드백 #1</span>
-                    <span className="badge badge-warning badge-sm">처리중</span>
-                  </div>
-                  <div className="text-xs text-base-content/60">
-                    제출일: 2024-01-18 | 3개 항목
-                  </div>
-                </div>
-                <div className="text-center text-sm text-base-content/40 py-4">
-                  이전 피드백이 없습니다
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 우측: 보고물 뷰어 (더 넓은 공간) */}
-        <div className="lg:col-span-3">
-          <div className="card bg-base-100 shadow-sm h-[600px]">
-            <div className="card-body p-0 flex flex-col">
-              {/* 보고물 뷰어 헤더 */}
-              <div className="p-4 border-b">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-bold text-lg">
-                      {reports.find((r) => r.id === selectedReport)?.name}
-                    </h3>
-                    {reports.find((r) => r.id === selectedReport)
-                      ?.submitted && (
-                      <p className="text-sm text-base-content/60">
-                        버전:{" "}
-                        {reports.find((r) => r.id === selectedReport)?.version}
-                      </p>
-                    )}
-                  </div>
-                  {reports.find((r) => r.id === selectedReport)?.submitted && (
-                    <div className="flex gap-2">
-                      <button className="btn btn-sm btn-outline">
-                        🖊️ 마크업 도구
-                      </button>
-                      <button className="btn btn-sm btn-outline">
-                        💾 다운로드
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* 보고물 뷰어 (전체 공간 활용) */}
-              <div className="flex-1 p-6">
-                {reports.find((r) => r.id === selectedReport)?.submitted ? (
-                  <div className="w-full h-full bg-gradient-to-br from-base-200 to-base-300 rounded-lg flex items-center justify-center shadow-inner">
-                    <div className="text-center">
-                      <div className="text-8xl mb-6">🎨</div>
-                      <p className="text-2xl font-medium mb-2">디자인 시안</p>
-                      <p className="text-base text-base-content/60 mb-4">
-                        실제 환경에서는 이미지/PDF 뷰어가 표시됩니다
-                      </p>
-                      <div className="flex gap-2 justify-center">
-                        <span className="badge badge-outline">1920×1080</span>
-                        <span className="badge badge-outline">PNG</span>
-                        <span className="badge badge-outline">2.3MB</span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="w-full h-full bg-base-200 rounded-lg flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="text-8xl mb-6">⏳</div>
-                      <p className="text-2xl font-medium mb-2">
-                        보고물 대기 중
-                      </p>
-                      <p className="text-base text-base-content/60">
-                        마감일:{" "}
-                        {reports.find((r) => r.id === selectedReport)?.date}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// 타임라인 탭 컴포넌트
-function TimelineTab({ project }: { project: Project }) {
-  const activities = [
-    {
-      type: "project_created",
-      title: "프로젝트 생성",
-      description: "김디자이너가 프로젝트를 생성했습니다.",
-      user: "김디자이너",
-      avatar: "👨‍🎨",
-      time: "2024-01-15 09:00",
-      icon: "🚀",
+      id: "file-3",
+      file: new File(["mock"], "brand_guideline.pdf", { type: "application/pdf" }),
+      name: "brand_guideline.pdf",
+      size: 5234567,
+      type: "application/pdf",
+      uploadProgress: 100,
+      uploadStatus: "completed" as const,
+      url: "#"
     },
     {
-      type: "contract_signed",
-      title: "계약서 서명 완료",
-      description: "클라이언트가 계약서에 서명했습니다.",
-      user: "홍길동",
-      avatar: "👤",
-      time: "2024-01-15 14:30",
-      icon: "✍️",
+      id: "file-4",
+      file: new File(["mock"], "intermediate_report.pdf", { type: "application/pdf" }),
+      name: "intermediate_report.pdf",
+      size: 3456789,
+      type: "application/pdf",
+      uploadProgress: 100,
+      uploadStatus: "completed" as const,
+      url: "#"
     },
     {
-      type: "report_uploaded",
-      title: "초안 업로드",
-      description: "초안 디자인이 업로드되었습니다.",
-      user: "김디자이너",
-      avatar: "👨‍🎨",
-      time: "2024-01-20 11:00",
-      icon: "📎",
-    },
-    {
-      type: "feedback_period_started",
-      title: "피드백 정리 기간 시작",
-      description: "클라이언트 피드백 수집이 시작되었습니다.",
-      user: "System",
-      avatar: "🤖",
-      time: "2024-01-20 11:01",
-      icon: "💬",
-    },
-  ];
-
-  return (
-    <div className="card bg-base-100 shadow-sm">
-      <div className="card-body">
-        <h3 className="card-title mb-6">프로젝트 활동 타임라인</h3>
-
-        <div className="space-y-6">
-          {activities.map((activity, index) => (
-            <div key={index} className="flex gap-4">
-              <div className="flex flex-col items-center">
-                <div className="w-10 h-10 rounded-full bg-primary text-primary-content flex items-center justify-center text-lg">
-                  {activity.icon}
-                </div>
-                {index < activities.length - 1 && (
-                  <div className="w-0.5 h-12 bg-base-300 mt-2"></div>
-                )}
-              </div>
-
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-1">
-                  <h4 className="font-bold">{activity.title}</h4>
-                  <span className="text-sm text-base-content/60">
-                    {activity.time}
-                  </span>
-                </div>
-                <p className="text-sm text-base-content/80 mb-2">
-                  {activity.description}
-                </p>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs">{activity.avatar}</span>
-                  <span className="text-xs font-medium">{activity.user}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// 수정 현황 카드 컴포넌트
-function ModificationStatusCard({
-  project,
-  userRole,
-  onOpenModal,
-}: {
-  project: Project;
-  userRole: "client" | "designer";
-  onOpenModal: () => void;
-}) {
-  const usedModifications =
-    project.total_modification_count - project.remaining_modification_count;
-
-  return (
-    <div className="card bg-gradient-to-r from-blue-50 to-indigo-50 shadow-lg border-l-4 border-l-primary">
-      <div className="card-body">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="card-title text-lg mb-2">수정 현황</h3>
-            <div className="grid grid-cols-3 gap-4 text-sm">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">
-                  {project.total_modification_count}
-                </div>
-                <div className="text-base-content/60">총 수정 횟수</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-warning">
-                  {usedModifications}
-                </div>
-                <div className="text-base-content/60">사용된 횟수</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-success">
-                  {project.remaining_modification_count}
-                </div>
-                <div className="text-base-content/60">남은 횟수</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <button className="btn btn-outline btn-sm" onClick={onOpenModal}>
-              📋 수정 체크리스트 보기
-            </button>
-            {userRole === "client" &&
-              project.remaining_modification_count > 0 && (
-                <button
-                  className="btn btn-warning btn-sm"
-                  onClick={onOpenModal}
-                >
-                  📝 피드백 제출
-                </button>
-              )}
-          </div>
-        </div>
-
-        {/* 진행률 바 */}
-        <div className="mt-4">
-          <div className="flex justify-between text-sm mb-1">
-            <span>수정 사용률</span>
-            <span>
-              {Math.round(
-                (usedModifications / project.total_modification_count) * 100
-              )}
-              %
-            </span>
-          </div>
-          <progress
-            className="progress progress-primary w-full"
-            value={usedModifications}
-            max={project.total_modification_count}
-          ></progress>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// 수정 체크리스트 모달 컴포넌트
-function ModificationChecklistModal({
-  project,
-  userRole,
-  onClose,
-}: {
-  project: Project;
-  userRole: "client" | "designer";
-  onClose: () => void;
-}) {
-  const [modificationItems, setModificationItems] = useState<
-    ModificationItem[]
-  >([]);
-  const [newItemContent, setNewItemContent] = useState("");
-
-  // 모의 기존 피드백 데이터
-  const existingFeedback: FeedbackBatch[] = [
-    {
-      id: "1",
-      reportId: "draft",
-      submittedAt: "2024-01-18T10:00:00Z",
-      status: "in_progress",
-      items: [
-        {
-          id: "1-1",
-          content: "로고 색상을 더 진한 파란색으로 변경해주세요",
-          status: "completed",
-          designerComment: "변경 완료했습니다.",
-          createdAt: "2024-01-18T10:00:00Z",
-        },
-        {
-          id: "1-2",
-          content: "텍스트 폰트를 좀 더 굵게 만들어주세요",
-          status: "in_progress",
-          designerComment: "작업 중입니다.",
-          createdAt: "2024-01-18T10:00:00Z",
-        },
-      ],
-    },
-  ];
-
-  const addModificationItem = () => {
-    if (newItemContent.trim()) {
-      const newItem: ModificationItem = {
-        id: Date.now().toString(),
-        content: newItemContent,
-        status: "pending",
-        createdAt: new Date().toISOString(),
-      };
-      setModificationItems([...modificationItems, newItem]);
-      setNewItemContent("");
+      id: "file-5",
+      file: new File(["mock"], "final_deliverables.zip", { type: "application/zip" }),
+      name: "final_deliverables.zip",
+      size: 12456789,
+      type: "application/zip",
+      uploadProgress: 100,
+      uploadStatus: "completed" as const,
+      url: "#"
     }
+  ];
+
+  const [projectFiles, setProjectFiles] = useState<UploadedFile[]>(mockProjectFiles);
+
+  // 파일 필터링 및 정렬 로직
+  const getFilteredAndSortedFiles = () => {
+    let filtered = projectFiles;
+
+    // 검색어 필터링
+    if (fileSearchTerm) {
+      filtered = filtered.filter(file => 
+        file.name.toLowerCase().includes(fileSearchTerm.toLowerCase())
+      );
+    }
+
+    // 카테고리 필터링
+    if (selectedFileCategory !== 'all') {
+      filtered = filtered.filter(file => {
+        const getFileCategory = (name: string) => {
+          if (name.includes('logo_design')) return 'draft';
+          if (name.includes('intermediate')) return 'intermediate';
+          if (name.includes('guideline') || name.includes('deliverables')) return 'final';
+          return 'other';
+        };
+        return getFileCategory(file.name) === selectedFileCategory;
+      });
+    }
+
+    // 정렬
+    filtered.sort((a, b) => {
+      switch (fileSortBy) {
+        case 'name':
+          return a.name.localeCompare(b.name);
+        case 'size':
+          return b.size - a.size;
+        case 'date':
+        default:
+          return 0; // 모의 데이터이므로 날짜 정렬은 기본 순서 유지
+      }
+    });
+
+    return filtered;
   };
 
-  const removeModificationItem = (id: string) => {
-    setModificationItems(modificationItems.filter((item) => item.id !== id));
-  };
+  // 피드백 히스토리 초기화
+  useEffect(() => {
+    feedbacks.forEach((feedback) => {
+      if (!FeedbackVersionManager.getFeedbackHistory(feedback.id)) {
+        FeedbackVersionManager.createFeedback(feedback);
+      }
+    });
+  }, [feedbacks]);
 
-  const submitFeedback = () => {
-    if (modificationItems.length === 0) {
-      alert("수정 요청을 하나 이상 추가해주세요.");
+
+  const availableActions = ProjectWorkflowManager.getAvailableActions(
+    project.status,
+    userRole
+  );
+  const statusInfo = ProjectWorkflowManager.getStatusDisplayInfo(
+    project.status
+  );
+  const progress = ProjectWorkflowManager.calculateProgress(project.status, {
+    milestonesCompleted: 2,
+    totalMilestones: 4,
+    feedbackRounds: feedbacks.filter((f) => f.status === "resolved").length,
+  });
+
+  const handleStatusChange = async (actionId: string) => {
+    // 워크플로우 액션 처리
+    const transition = ProjectWorkflowManager.getAvailableTransitions(
+      project.status,
+      userRole
+    ).find((t) => actionId.includes(t.to));
+
+    if (!transition) return;
+
+    const validation = ProjectWorkflowManager.validateTransition(
+      project.status,
+      transition.to,
+      userRole,
+      {
+        hasDraftFiles: true, // Mock data
+        hasFinalDeliverables: actionId === "request_completion",
+        hasFeedback: feedbacks.length > 0,
+        remainingModifications: project.remaining_modification_count,
+      }
+    );
+
+    if (!validation.valid) {
+      alert(validation.errors.join("\n"));
       return;
     }
 
-    if (
-      confirm(
-        `${modificationItems.length}개의 수정 요청을 제출하시겠습니까? 수정 횟수 1회가 차감됩니다.`
-      )
-    ) {
-      // 실제로는 API 호출
-      alert("피드백이 성공적으로 제출되었습니다!");
-      onClose();
+    if (transition.requiresConfirmation) {
+      const confirmed = confirm(
+        `${transition.description}\n\n계속 진행하시겠습니까?`
+      );
+      if (!confirmed) return;
+    }
+
+    // 상태 업데이트
+    setProject((prev) => ({
+      ...prev,
+      status: transition.to,
+      updated_at: new Date().toISOString(),
+    }));
+
+    // 알림 추가
+    addNotification({
+      message: `프로젝트가 "${
+        ProjectWorkflowManager.getStatusDisplayInfo(transition.to).label
+      }" 상태로 변경되었습니다.`,
+      user_id: user?.id || "",
+      url: `/projects/${projectId}`,
+    });
+  };
+
+  const handleFeedbackSubmit = (
+    feedbackData: Omit<
+      Feedback,
+      "id" | "submitted_at" | "updated_at" | "version"
+    >
+  ) => {
+    const newFeedback: Feedback = {
+      ...feedbackData,
+      id: Date.now().toString(),
+      submitted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      version: 1,
+    };
+
+    setFeedbacks((prev) => [...prev, newFeedback]);
+    FeedbackVersionManager.createFeedback(newFeedback);
+    setShowFeedbackForm(false);
+
+    addNotification({
+      message: "새로운 피드백이 제출되었습니다.",
+      user_id: user?.id || "",
+      url: `/projects/${projectId}?tab=feedback`,
+    });
+  };
+
+  const handleFeedbackEdit = (feedback: Feedback) => {
+    setEditingFeedback(feedback);
+    setShowFeedbackForm(true);
+  };
+
+  const handleFeedbackStatusChange = (
+    feedbackId: string,
+    status: Feedback["status"]
+  ) => {
+    const updatedFeedbacks = feedbacks.map((f) =>
+      f.id === feedbackId
+        ? { ...f, status, updated_at: new Date().toISOString() }
+        : f
+    );
+
+    setFeedbacks(updatedFeedbacks);
+
+    FeedbackVersionManager.updateFeedback(
+      feedbackId,
+      { status },
+      user?.id || ""
+    );
+  };
+
+  const handleFilesUpload = (newFiles: UploadedFile[]) => {
+    setProjectFiles((prev) => [...prev, ...newFiles]);
+    addNotification({
+      message: `${newFiles.length}개의 파일이 업로드되었습니다.`,
+      user_id: user?.id || "",
+      url: `/projects/${projectId}?tab=files`,
+    });
+  };
+
+  const handleFileRemove = (fileId: string) => {
+    setProjectFiles((prev) => prev.filter((f) => f.id !== fileId));
+  };
+
+  // 파일 다운로드 (모의 구현)
+  const handleFileDownload = (file: UploadedFile | any) => {
+    // 실제 구현에서는 서버에서 파일을 다운로드
+    console.log('파일 다운로드:', file.name);
+    addNotification({
+      message: `${file.name} 다운로드를 시작합니다.`,
+      user_id: user?.id || "",
+      url: `/projects/${projectId}?tab=files`,
+    });
+  };
+
+  // 파일 공유 링크 생성 (모의 구현)
+  const handleFileShare = (file: UploadedFile | any) => {
+    const shareLink = `${window.location.origin}/projects/${projectId}/files/${file.id}`;
+    navigator.clipboard.writeText(shareLink);
+    addNotification({
+      message: `${file.name}의 공유 링크가 복사되었습니다.`,
+      user_id: user?.id || "",
+      url: `/projects/${projectId}?tab=files`,
+    });
+  };
+
+  // 파일 선택 핸들러
+  const handleFileSelect = (stage: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files) {
+      const fileArray = Array.from(files);
+      switch (stage) {
+        case 'draft':
+          setDraftFiles(fileArray);
+          break;
+        case 'intermediate':
+          setIntermediateFiles(fileArray);
+          break;
+        case 'final':
+          setFinalFiles(fileArray);
+          break;
+      }
+      
+      // 파일 선택 후 업로드 상태 표시
+      setUploadingStage(stage);
+      console.log(`${stage} 파일 선택됨:`, fileArray);
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-base-100 rounded-lg max-w-5xl w-full max-h-[90vh] overflow-hidden">
-        {/* 모달 헤더 */}
-        <div className="p-6 border-b">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold">수정 체크리스트</h2>
-              <p className="text-sm text-base-content/60">
-                초안 관련 수정 요청
-              </p>
-            </div>
-            <button
-              className="btn btn-sm btn-circle btn-ghost"
-              onClick={onClose}
-            >
-              ✕
-            </button>
-          </div>
-        </div>
+  // 파일 업로드 핸들러
+  const handleUpload = async (stage: string, title?: string, description?: string, fileType?: string) => {
+    let files: File[] = [];
+    switch (stage) {
+      case 'draft':
+        files = draftFiles;
+        break;
+      case 'intermediate':
+        files = intermediateFiles;
+        break;
+      case 'final':
+        files = finalFiles;
+        break;
+    }
 
-        {/* 모달 컨텐츠 */}
-        <div className="p-6 overflow-y-auto max-h-[70vh]">
-          {userRole === "client" ? (
-            // 클라이언트 뷰: 새 피드백 작성
-            <div className="space-y-8">
-              <div>
-                <h3 className="text-xl font-bold mb-6">새 수정 요청 작성</h3>
+    if (files.length === 0) {
+      alert('먼저 파일을 선택해주세요.');
+      return;
+    }
 
-                {/* 현재 작성 중인 수정 요청들 */}
-                <div className="space-y-4 mb-6">
-                  {modificationItems.map((item, index) => (
-                    <div
-                      key={item.id}
-                      className="flex gap-4 p-4 bg-base-200 rounded-lg"
-                    >
-                      <div className="flex-1">
-                        <div className="font-medium mb-2">
-                          수정 요청 {index + 1}
-                        </div>
-                        <div className="text-sm bg-base-100 p-3 rounded">
-                          {item.content}
-                        </div>
+    // 업로드 시뮬레이션
+    setUploadingStage(stage);
+    console.log(`${stage} 파일 업로드 중:`, files);
+    
+    // 실제로는 서버 API 호출
+    try {
+      // 업로드된 파일들을 projectFiles에 추가 (모의 구현)
+      const newUploadedFiles: UploadedFile[] = files.map((file, index) => {
+        const isImage = file.type.startsWith('image/');
+        return {
+          id: `uploaded-${Date.now()}-${index}`,
+          file: file,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          preview: isImage ? URL.createObjectURL(file) : undefined,
+          uploadProgress: 100,
+          uploadStatus: "completed" as const,
+          url: "#",
+          metadata: {
+            title: title || file.name,
+            description: description || `${stage} 단계 파일`,
+            fileType: fileType || 'general',
+            uploadedAt: new Date().toISOString()
+          }
+        };
+      });
+
+      // 2초 후 파일을 목록에 추가
+      setTimeout(() => {
+        setProjectFiles((prev) => [...prev, ...newUploadedFiles]);
+        setUploadingStage(null);
+        
+        // 업로드 완료 후 파일 선택 초기화
+        switch (stage) {
+          case 'draft':
+            setDraftFiles([]);
+            break;
+          case 'intermediate':
+            setIntermediateFiles([]);
+            break;
+          case 'final':
+            setFinalFiles([]);
+            break;
+        }
+        
+        addNotification({
+          message: `${files.length}개의 ${stage === 'draft' ? '디자인 초안' : stage === 'intermediate' ? '중간 작업물' : '최종 결과물'}이 업로드되었습니다.`,
+          user_id: user?.id || "",
+          url: `/projects/${projectId}?tab=files`,
+        });
+      }, 2000);
+    } catch (error) {
+      setUploadingStage(null);
+      alert('업로드 중 오류가 발생했습니다. 다시 시도해주세요.');
+    }
+  };
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case "overview":
+        return (
+          <div className="space-y-6">
+            {/* 프로젝트 기본 정보 */}
+            <div className="card bg-base-100 shadow-sm">
+              <div className="card-body">
+                <h3 className="text-lg font-semibold mb-4">프로젝트 정보</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="font-medium mb-2">기본 정보</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>프로젝트명:</span>
+                        <span className="font-medium">{project.name}</span>
                       </div>
+                      <div className="flex justify-between">
+                        <span>예상 금액:</span>
+                        <span className="font-medium">
+                          {project.estimated_price.toLocaleString()}원
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>수정 횟수:</span>
+                        <span
+                          className={`font-medium ${
+                            project.remaining_modification_count === 0
+                              ? "text-error"
+                              : "text-success"
+                          }`}
+                        >
+                          {project.remaining_modification_count}/
+                          {project.total_modification_count}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium mb-2">일정</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>시작일:</span>
+                        <span>
+                          {new Date(project.start_date).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>마감일:</span>
+                        <span>
+                          {new Date(project.end_date).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>초안 마감:</span>
+                        <span>
+                          {new Date(
+                            project.draft_deadline
+                          ).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <h4 className="font-medium mb-2">요구사항</h4>
+                  <p className="text-sm text-base-content/80 bg-base-200 p-3 rounded">
+                    {project.requirements}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 진행률 */}
+            <div className="card bg-base-100 shadow-sm">
+              <div className="card-body">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">진행 현황</h3>
+                  <span className={`badge badge-${statusInfo.color} badge-lg`}>
+                    {statusInfo.icon} {statusInfo.label}
+                  </span>
+                </div>
+
+                <div className="mb-4">
+                  <div className="flex justify-between text-sm mb-2">
+                    <span>전체 진행률</span>
+                    <span className="font-medium">{progress}%</span>
+                  </div>
+                  <progress
+                    className={`progress progress-${
+                      statusInfo.color === "success" ? "success" : "primary"
+                    } w-full`}
+                    value={progress}
+                    max="100"
+                  />
+                </div>
+
+                <p className="text-sm text-base-content/70">
+                  {statusInfo.description}
+                </p>
+              </div>
+            </div>
+
+            {/* 가능한 액션들 */}
+            {availableActions.length > 0 && (
+              <div className="card bg-base-100 shadow-sm">
+                <div className="card-body">
+                  <h3 className="text-lg font-semibold mb-4">가능한 작업</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {availableActions.map((action) => (
                       <button
-                        className="btn btn-sm btn-ghost text-error"
-                        onClick={() => removeModificationItem(item.id)}
+                        key={action.id}
+                        onClick={() => handleStatusChange(action.id)}
+                        className={`btn btn-${action.variant}`}
                       >
-                        ✕
+                        {action.icon} {action.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
+      case "feedback":
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">피드백 관리</h3>
+              <button
+                onClick={() => setShowFeedbackForm(true)}
+                className="btn btn-primary"
+              >
+                ✍️ 새 피드백 작성
+              </button>
+            </div>
+
+            {showFeedbackForm && (
+              <FeedbackForm
+                projectId={projectId}
+                reportId="report-1"
+                onSubmit={handleFeedbackSubmit}
+                onCancel={() => {
+                  setShowFeedbackForm(false);
+                  setEditingFeedback(null);
+                }}
+                existingFeedback={editingFeedback || undefined}
+              />
+            )}
+
+            <FeedbackList
+              feedbacks={feedbacks}
+              onEdit={handleFeedbackEdit}
+              onStatusChange={handleFeedbackStatusChange}
+              showActions={true}
+              groupByStatus={true}
+            />
+          </div>
+        );
+
+      case "files":
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">파일 및 자료</h3>
+              <div className="text-sm text-base-content/60">
+                {fileSearchTerm || selectedFileCategory !== 'all' 
+                  ? `검색 결과: ${getFilteredAndSortedFiles().length}개 (전체 ${projectFiles.length}개)`
+                  : `총 ${projectFiles.length}개 파일`
+                }
+              </div>
+            </div>
+
+            {/* 파일 검색 및 필터 */}
+            <div className="card bg-base-100 shadow-sm mb-6">
+              <div className="card-body py-4">
+                <div className="flex flex-col md:flex-row gap-4 items-center">
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      placeholder="파일명으로 검색..."
+                      className="input input-bordered input-sm w-full"
+                      value={fileSearchTerm}
+                      onChange={(e) => setFileSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex space-x-2">
+                    <select 
+                      className="select select-bordered select-sm"
+                      value={selectedFileCategory}
+                      onChange={(e) => setSelectedFileCategory(e.target.value)}
+                    >
+                      <option value="all">전체 파일</option>
+                      <option value="draft">디자인 초안</option>
+                      <option value="intermediate">중간 작업물</option>
+                      <option value="final">최종 결과물</option>
+                    </select>
+                    <select 
+                      className="select select-bordered select-sm"
+                      value={fileSortBy}
+                      onChange={(e) => setFileSortBy(e.target.value)}
+                    >
+                      <option value="date">날짜순</option>
+                      <option value="name">이름순</option>
+                      <option value="size">크기순</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 작업 진행 단계별 이미지 갤러리 */}
+            <div className="space-y-8 mb-8">
+              <h3 className="text-xl font-bold flex items-center space-x-2">
+                <span>🎯</span>
+                <span>작업 진행 상황</span>
+              </h3>
+              
+              {/* 1단계: 디자인 초안 */}
+              <div className="card bg-gradient-to-r from-primary/5 to-primary/10 shadow-sm">
+                <div className="card-body">
+                  <div className="flex items-center space-x-3 mb-6">
+                    <div className="w-8 h-8 bg-primary text-primary-content rounded-full flex items-center justify-center font-bold">1</div>
+                    <div>
+                      <h4 className="text-lg font-semibold">디자인 초안</h4>
+                      <p className="text-sm text-base-content/70">2024.01.20 - 2024.01.23</p>
+                    </div>
+                    <div className="badge badge-primary">완료</div>
+                  </div>
+                  
+                  {/* 파일 갤러리 */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">업로드된 초안: {mockDraftFiles.length}개</span>
+                      <button 
+                        className="btn btn-ghost btn-xs"
+                        onClick={() => setShowAllDrafts(!showAllDrafts)}
+                      >
+                        {showAllDrafts ? '접기' : '전체보기'} 
+                        <span className="ml-1">{showAllDrafts ? '▲' : '▼'}</span>
                       </button>
                     </div>
-                  ))}
-                </div>
-
-                {/* 새 항목 추가 */}
-                <div className="bg-base-100 p-6 rounded-lg border-2 border-dashed border-base-300">
-                  <h4 className="font-medium mb-4">새 수정 요청 추가</h4>
-                  <div className="flex gap-3">
-                    <textarea
-                      className="textarea textarea-bordered flex-1 h-20"
-                      placeholder="구체적인 수정 요청을 입력하세요... (예: 로고 색상을 #0066CC로 변경)"
-                      value={newItemContent}
-                      onChange={(e) => setNewItemContent(e.target.value)}
-                    />
-                    <button
-                      className="btn btn-primary"
-                      onClick={addModificationItem}
-                      disabled={!newItemContent.trim()}
-                    >
-                      추가
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* 기존 피드백 이력 */}
-              <div>
-                <h3 className="text-xl font-bold mb-6">이전 피드백 이력</h3>
-                {existingFeedback.map((batch) => (
-                  <div key={batch.id} className="card bg-base-200 mb-4">
-                    <div className="card-body p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <span className="font-bold text-lg">
-                          피드백 #{batch.id}
-                        </span>
-                        <span className="text-sm text-base-content/60">
-                          제출일:{" "}
-                          {new Date(batch.submittedAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <div className="space-y-3">
-                        {batch.items.map((item) => (
-                          <div
-                            key={item.id}
-                            className="flex items-start gap-4 p-3 bg-base-100 rounded-lg"
-                          >
-                            <div
-                              className={`w-4 h-4 rounded-full mt-1 ${
-                                item.status === "completed"
-                                  ? "bg-success"
-                                  : item.status === "in_progress"
-                                  ? "bg-warning"
-                                  : "bg-base-300"
-                              }`}
-                            ></div>
-                            <div className="flex-1">
-                              <span className="font-medium">
-                                {item.content}
-                              </span>
-                              {item.designerComment && (
-                                <div className="text-sm text-info mt-2">
-                                  💬 디자이너: {item.designerComment}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            // 디자이너 뷰: 피드백 처리
-            <div className="space-y-6">
-              <h3 className="text-xl font-bold mb-6">클라이언트 피드백 처리</h3>
-              {existingFeedback.map((batch) => (
-                <div key={batch.id} className="card bg-base-200">
-                  <div className="card-body">
-                    <div className="flex items-center justify-between mb-6">
-                      <h4 className="text-lg font-bold">피드백 #{batch.id}</h4>
-                      <span className="badge badge-warning badge-lg">
-                        처리 중
-                      </span>
-                    </div>
-                    <div className="space-y-4">
-                      {batch.items.map((item) => (
-                        <div
-                          key={item.id}
-                          className="p-4 bg-base-100 rounded-lg"
-                        >
-                          <div className="flex items-start gap-4 mb-3">
-                            <input
-                              type="checkbox"
-                              className="checkbox checkbox-primary mt-1"
-                              checked={item.status === "completed"}
+                    
+                    <div className={`grid ${showAllDrafts ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4' : 'grid-cols-2 md:grid-cols-4'} gap-3`}>
+                      {(showAllDrafts ? mockDraftFiles : mockDraftFiles.slice(0, 4)).map((file, index) => (
+                        <div key={file.id} className="bg-base-100 p-3 rounded-lg hover:shadow-md transition-shadow">
+                          <div className="relative">
+                            <img 
+                              src={file.preview} 
+                              alt={file.name}
+                              className={`w-full ${showAllDrafts ? 'h-24' : 'h-32'} object-cover rounded cursor-pointer`}
+                              onClick={() => setSelectedImage({
+                                src: file.preview,
+                                alt: file.name,
+                                title: file.name,
+                                description: `업로드일: ${file.uploadDate}, 크기: ${file.size}KB`
+                              })}
                             />
-                            <div className="flex-1">
-                              <div className="font-medium mb-2">
-                                {item.content}
-                              </div>
-                              <div className="text-sm text-base-content/60">
-                                상태:{" "}
-                                {item.status === "completed"
-                                  ? "완료"
-                                  : item.status === "in_progress"
-                                  ? "진행 중"
-                                  : "대기"}
-                              </div>
+                            <div className="absolute top-1 right-1 bg-black/50 text-white text-xs px-1 rounded">
+                              V{index + 1}
                             </div>
                           </div>
-                          <textarea
-                            className="textarea textarea-bordered w-full text-sm"
-                            placeholder="디자이너 코멘트를 입력하세요..."
-                            value={item.designerComment || ""}
-                            rows={2}
-                          />
+                          <div className="mt-2">
+                            <p className="text-xs font-medium truncate" title={file.name}>
+                              {file.name}
+                            </p>
+                            <div className="flex items-center justify-between mt-1">
+                              <span className="text-xs text-base-content/60">{file.uploadDate}</span>
+                              <span className="text-xs text-base-content/60">{file.size}KB</span>
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* 모달 푸터 */}
-        <div className="p-6 border-t bg-base-50">
-          <div className="flex justify-end gap-3">
-            <button className="btn btn-ghost" onClick={onClose}>
-              닫기
-            </button>
-            {userRole === "client" && (
-              <>
-                <button className="btn btn-outline">임시저장</button>
-                <button
-                  className="btn btn-warning btn-lg"
-                  onClick={submitFeedback}
-                  disabled={modificationItems.length === 0}
-                >
-                  📝 피드백 확정 및 제출 (수정 횟수 차감)
-                </button>
-              </>
-            )}
-            {userRole === "designer" && (
-              <button className="btn btn-success btn-lg">
-                ✅ 수정 완료 알림
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// 프로젝트 완료 요청 모달 컴포넌트
-function CompletionRequestModal({
-  project,
-  onClose,
-}: {
-  project: Project;
-  onClose: () => void;
-}) {
-  const [completionNote, setCompletionNote] = useState("");
-  const [finalFiles, setFinalFiles] = useState<File[]>([]);
-
-  const handleSubmit = () => {
-    if (!completionNote.trim()) {
-      alert("완료 요청 메모를 입력해주세요.");
-      return;
-    }
-
-    if (finalFiles.length === 0) {
-      alert("최종 산출물을 하나 이상 업로드해주세요.");
-      return;
-    }
-
-    if (confirm("프로젝트 완료를 요청하시겠습니까?")) {
-      // 실제로는 API 호출
-      alert("완료 요청이 전송되었습니다. 클라이언트의 승인을 기다려주세요.");
-      onClose();
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-base-100 rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden">
-        <div className="p-6 border-b">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold">프로젝트 완료 요청</h2>
-            <button
-              className="btn btn-sm btn-circle btn-ghost"
-              onClick={onClose}
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-
-        <div className="p-6 overflow-y-auto max-h-[70vh]">
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-bold mb-4">완료 요청 메모</h3>
-              <textarea
-                className="textarea textarea-bordered w-full h-32"
-                placeholder="프로젝트 완료와 함께 클라이언트에게 전달할 메시지를 작성해주세요..."
-                value={completionNote}
-                onChange={(e) => setCompletionNote(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <h3 className="text-lg font-bold mb-4">최종 산출물 업로드</h3>
-              <div className="border-2 border-dashed border-base-300 rounded-lg p-8 text-center">
-                <div className="text-6xl mb-4">📁</div>
-                <p className="text-lg font-medium mb-2">
-                  파일을 드래그하거나 클릭하여 업로드
-                </p>
-                <p className="text-sm text-base-content/60 mb-4">
-                  최종 원본 파일 (PSD, AI, FIG) 및 결과물 (PNG, JPG, PDF) 등
-                </p>
-                <input
-                  type="file"
-                  multiple
-                  className="file-input file-input-bordered"
-                  onChange={(e) => {
-                    if (e.target.files) {
-                      setFinalFiles(Array.from(e.target.files));
-                    }
-                  }}
-                />
-              </div>
-
-              {finalFiles.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  <p className="font-medium">선택된 파일:</p>
-                  {finalFiles.map((file, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-2 bg-base-200 rounded"
-                    >
-                      <span className="text-sm">📎 {file.name}</span>
-                      <span className="text-xs text-base-content/60">
-                        {(file.size / 1024 / 1024).toFixed(2)} MB
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 border-t bg-base-50">
-          <div className="flex justify-end gap-3">
-            <button className="btn btn-ghost" onClick={onClose}>
-              취소
-            </button>
-            <button className="btn btn-success btn-lg" onClick={handleSubmit}>
-              ✅ 완료 요청 전송
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// 최종 산출물 확인/다운로드 모달 컴포넌트
-function FinalDeliverableModal({
-  project,
-  userRole,
-  onClose,
-}: {
-  project: Project;
-  userRole: "client" | "designer";
-  onClose: () => void;
-}) {
-  // 모의 최종 산출물 데이터
-  const finalDeliverables = [
-    {
-      name: "로고_최종_원본.ai",
-      size: "15.2 MB",
-      type: "원본 파일",
-      downloadUrl: "#",
-    },
-    {
-      name: "로고_최종_고해상도.png",
-      size: "8.7 MB",
-      type: "결과물",
-      downloadUrl: "#",
-    },
-    {
-      name: "브랜드_가이드라인.pdf",
-      size: "12.1 MB",
-      type: "가이드라인",
-      downloadUrl: "#",
-    },
-  ];
-
-  const handleApproveCompletion = () => {
-    if (
-      confirm(
-        "프로젝트를 최종 완료하시겠습니까? 완료 후에는 수정이 불가능합니다."
-      )
-    ) {
-      // 실제로는 API 호출
-      alert("프로젝트가 완료되었습니다!");
-      onClose();
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-base-100 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
-        <div className="p-6 border-b">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold">최종 산출물</h2>
-            <button
-              className="btn btn-sm btn-circle btn-ghost"
-              onClick={onClose}
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-
-        <div className="p-6 overflow-y-auto max-h-[70vh]">
-          <div className="space-y-6">
-            {project.status === "completion_requested" &&
-              userRole === "client" && (
-                <div className="alert alert-warning">
-                  <span>
-                    ⚠️ 디자이너가 프로젝트 완료를 요청했습니다. 최종 산출물을
-                    확인하시고 승인해주세요.
-                  </span>
-                </div>
-              )}
-
-            <div>
-              <h3 className="text-lg font-bold mb-4">완료 요청 메모</h3>
-              <div className="bg-base-200 p-4 rounded-lg">
-                <p className="text-sm">
-                  안녕하세요! 로고 디자인 작업이 완료되었습니다. 요청하신 모든
-                  요구사항을 반영하여 최종 결과물을 준비했습니다. 원본 파일과
-                  다양한 포맷의 결과물을 함께 전달드리니 확인 부탁드립니다.
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-bold mb-4">다운로드 가능한 파일</h3>
-              <div className="grid gap-3">
-                {finalDeliverables.map((file, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-4 bg-base-200 rounded-lg"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="text-3xl">
-                        {file.type === "원본 파일"
-                          ? "🎨"
-                          : file.type === "결과물"
-                          ? "🖼️"
-                          : "📄"}
+                    
+                    {!showAllDrafts && mockDraftFiles.length > 4 && (
+                      <div className="text-center">
+                        <button 
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => setShowAllDrafts(true)}
+                        >
+                          +{mockDraftFiles.length - 4}개 더보기
+                        </button>
                       </div>
-                      <div>
-                        <div className="font-medium">{file.name}</div>
-                        <div className="text-sm text-base-content/60">
-                          {file.type} • {file.size}
+                    )}
+                  </div>
+                  
+                  {userRole === "designer" && (
+                    <div className="mt-4 p-4 border-2 border-dashed border-primary/30 rounded-lg bg-primary/5">
+                      <div className="flex items-center justify-between mb-3">
+                        <h5 className="text-sm font-medium flex items-center space-x-2">
+                          <span>📎</span>
+                          <span>새 초안 업로드</span>
+                        </h5>
+                      </div>
+                      <div className="space-y-3">
+                        <input 
+                          type="text" 
+                          placeholder="작업물 이름 (예: 로고 초안 V3)" 
+                          className="input input-sm input-bordered w-full"
+                          value={uploadMetadata.draft.title}
+                          onChange={(e) => setUploadMetadata(prev => ({
+                            ...prev,
+                            draft: { ...prev.draft, title: e.target.value }
+                          }))}
+                        />
+                        <textarea 
+                          placeholder="작업물 설명 (예: 색상 톤을 조정하고 폰트를 변경한 버전)" 
+                          className="textarea textarea-sm textarea-bordered w-full h-16"
+                          value={uploadMetadata.draft.description}
+                          onChange={(e) => setUploadMetadata(prev => ({
+                            ...prev,
+                            draft: { ...prev.draft, description: e.target.value }
+                          }))}
+                        />
+                        <div className="flex space-x-2">
+                          <input
+                            type="file"
+                            id="draft-file-input"
+                            className="hidden"
+                            multiple
+                            accept="image/*,.pdf,.ai,.psd"
+                            onChange={handleFileSelect('draft')}
+                          />
+                          <button 
+                            className="btn btn-primary btn-sm"
+                            onClick={() => document.getElementById('draft-file-input')?.click()}
+                          >
+                            <span>📁</span>
+                            파일 선택
+                            {draftFiles.length > 0 && ` (${draftFiles.length}개)`}
+                          </button>
+                          <button 
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => handleUpload('draft', uploadMetadata.draft.title, uploadMetadata.draft.description, uploadMetadata.draft.fileType)}
+                            disabled={uploadingStage === 'draft'}
+                          >
+                            {uploadingStage === 'draft' ? (
+                              <>
+                                <span className="loading loading-spinner loading-sm"></span>
+                                업로드 중...
+                              </>
+                            ) : (
+                              '업로드'
+                            )}
+                          </button>
+                        </div>
+                        
+                        {/* 선택된 파일 미리보기 */}
+                        {draftFiles.length > 0 && (
+                          <div className="mt-3 p-3 bg-base-200 rounded">
+                            <p className="text-sm font-medium mb-2">선택된 파일:</p>
+                            <div className="space-y-1">
+                              {draftFiles.map((file, index) => (
+                                <div key={index} className="flex items-center space-x-2 text-sm">
+                                  <span>📄</span>
+                                  <span className="truncate">{file.name}</span>
+                                  <span className="text-xs text-base-content/60">
+                                    ({Math.round(file.size / 1024)}KB)
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {userRole === "client" && (
+                    <div className="mt-4 p-4 border-2 border-dashed border-accent/30 rounded-lg bg-accent/5">
+                      <div className="flex items-center justify-between mb-3">
+                        <h5 className="text-sm font-medium flex items-center space-x-2">
+                          <span>💬</span>
+                          <span>피드백 남기기</span>
+                        </h5>
+                      </div>
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-4">
+                          <label className="cursor-pointer label flex items-center space-x-2">
+                            <input type="radio" name="feedback-type" className="radio radio-success radio-sm" />
+                            <span className="text-sm">승인</span>
+                          </label>
+                          <label className="cursor-pointer label flex items-center space-x-2">
+                            <input type="radio" name="feedback-type" className="radio radio-warning radio-sm" />
+                            <span className="text-sm">수정 요청</span>
+                          </label>
+                        </div>
+                        <textarea 
+                          placeholder="피드백을 입력하세요 (예: 전체적으로 만족스럽습니다. 다음 단계로 진행해주세요.)" 
+                          className="textarea textarea-sm textarea-bordered w-full h-20"
+                        />
+                        <button className="btn btn-accent btn-sm">피드백 제출</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 2단계: 중간 작업물 */}
+              <div className="card bg-gradient-to-r from-warning/5 to-warning/10 shadow-sm">
+                <div className="card-body">
+                  <div className="flex items-center space-x-3 mb-6">
+                    <div className="w-8 h-8 bg-warning text-warning-content rounded-full flex items-center justify-center font-bold">2</div>
+                    <div>
+                      <h4 className="text-lg font-semibold">중간 작업물</h4>
+                      <p className="text-sm text-base-content/70">2024.01.25 - 2024.02.05</p>
+                    </div>
+                    <div className="badge badge-warning">진행중</div>
+                  </div>
+                  
+                  {/* 중간 작업물 갤러리 */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">중간 작업물: {mockIntermediateFiles.length}개</span>
+                      <button 
+                        className="btn btn-ghost btn-xs"
+                        onClick={() => setShowAllIntermediate(!showAllIntermediate)}
+                      >
+                        {showAllIntermediate ? '접기' : '전체보기'} 
+                        <span className="ml-1">{showAllIntermediate ? '▲' : '▼'}</span>
+                      </button>
+                    </div>
+                    
+                    {/* 유형별 필터 탭 */}
+                    <div className="flex space-x-2 overflow-x-auto">
+                      <div className="badge badge-outline">전체 {mockIntermediateFiles.length}</div>
+                      <div className="badge badge-outline">명함 {mockIntermediateFiles.filter(f => f.type === '명함').length}</div>
+                      <div className="badge badge-outline">레터헤드 {mockIntermediateFiles.filter(f => f.type === '레터헤드').length}</div>
+                      <div className="badge badge-outline">브로셔 {mockIntermediateFiles.filter(f => f.type === '브로셔').length}</div>
+                    </div>
+                    
+                    <div className={`grid ${showAllIntermediate ? 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6' : 'grid-cols-3 md:grid-cols-6'} gap-3`}>
+                      {(showAllIntermediate ? mockIntermediateFiles : mockIntermediateFiles.slice(0, 6)).map((file, index) => (
+                        <div key={file.id} className="bg-base-100 p-2 rounded-lg hover:shadow-md transition-shadow">
+                          <div className="relative">
+                            {file.preview ? (
+                              <img 
+                                src={file.preview} 
+                                alt={file.name}
+                                className={`w-full ${showAllIntermediate ? 'h-20' : 'h-24'} object-cover rounded cursor-pointer`}
+                                onClick={() => setSelectedImage({
+                                  src: file.preview || '',
+                                  alt: file.name,
+                                  title: `${file.type} - ${file.name}`,
+                                  description: `업로드일: ${file.uploadDate}, 크기: ${file.size}KB`
+                                })}
+                              />
+                            ) : (
+                              <div className={`w-full ${showAllIntermediate ? 'h-20' : 'h-24'} bg-warning/10 rounded flex items-center justify-center`}>
+                                <span className="text-2xl">📄</span>
+                              </div>
+                            )}
+                            <div className="absolute top-1 right-1 bg-warning text-warning-content text-xs px-1 rounded">
+                              {file.type}
+                            </div>
+                          </div>
+                          <div className="mt-2">
+                            <p className="text-xs font-medium truncate" title={file.name}>
+                              {file.name}
+                            </p>
+                            <div className="flex items-center justify-between mt-1">
+                              <span className="text-xs text-base-content/60">{file.uploadDate}</span>
+                              <span className="text-xs text-base-content/60">{file.size}KB</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {!showAllIntermediate && mockIntermediateFiles.length > 6 && (
+                      <div className="text-center">
+                        <button 
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => setShowAllIntermediate(true)}
+                        >
+                          +{mockIntermediateFiles.length - 6}개 더보기
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {userRole === "designer" && (
+                    <div className="mt-4 p-4 border-2 border-dashed border-warning/30 rounded-lg bg-warning/5">
+                      <div className="flex items-center justify-between mb-3">
+                        <h5 className="text-sm font-medium flex items-center space-x-2">
+                          <span>📎</span>
+                          <span>중간 작업물 업로드</span>
+                        </h5>
+                      </div>
+                      <div className="space-y-3">
+                        <select 
+                          className="select select-sm select-bordered w-full"
+                          value={uploadMetadata.intermediate.fileType}
+                          onChange={(e) => setUploadMetadata(prev => ({
+                            ...prev,
+                            intermediate: { ...prev.intermediate, fileType: e.target.value }
+                          }))}
+                        >
+                          <option disabled value="general">작업물 유형을 선택하세요</option>
+                          <option value="business-card">명함 디자인</option>
+                          <option value="letterhead">레터헤드</option>
+                          <option value="brochure">브로셔 디자인</option>
+                          <option value="packaging">패키징 디자인</option>
+                          <option value="other">기타</option>
+                        </select>
+                        <input 
+                          type="text" 
+                          placeholder="작업물 이름 (예: 명함 디자인 최종안)" 
+                          className="input input-sm input-bordered w-full"
+                          value={uploadMetadata.intermediate.title}
+                          onChange={(e) => setUploadMetadata(prev => ({
+                            ...prev,
+                            intermediate: { ...prev.intermediate, title: e.target.value }
+                          }))}
+                        />
+                        <textarea 
+                          placeholder="작업물 설명 및 특징 (예: 양면 명함, 무광 코팅 적용)" 
+                          className="textarea textarea-sm textarea-bordered w-full h-16"
+                          value={uploadMetadata.intermediate.description}
+                          onChange={(e) => setUploadMetadata(prev => ({
+                            ...prev,
+                            intermediate: { ...prev.intermediate, description: e.target.value }
+                          }))}
+                        />
+                        <div className="flex space-x-2">
+                          <input
+                            type="file"
+                            id="intermediate-file-input"
+                            className="hidden"
+                            multiple
+                            accept="image/*,.pdf,.ai,.psd"
+                            onChange={handleFileSelect('intermediate')}
+                          />
+                          <button 
+                            className="btn btn-warning btn-sm"
+                            onClick={() => document.getElementById('intermediate-file-input')?.click()}
+                          >
+                            <span>📁</span>
+                            파일 선택
+                            {intermediateFiles.length > 0 && ` (${intermediateFiles.length}개)`}
+                          </button>
+                          <button 
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => handleUpload('intermediate', uploadMetadata.intermediate.title, uploadMetadata.intermediate.description, uploadMetadata.intermediate.fileType)}
+                            disabled={uploadingStage === 'intermediate'}
+                          >
+                            {uploadingStage === 'intermediate' ? (
+                              <>
+                                <span className="loading loading-spinner loading-sm"></span>
+                                업로드 중...
+                              </>
+                            ) : (
+                              '업로드'
+                            )}
+                          </button>
                         </div>
                       </div>
                     </div>
-                    <button className="btn btn-primary btn-sm">
-                      📥 다운로드
-                    </button>
-                  </div>
-                ))}
+                  )}
+                  
+                  {userRole === "client" && (
+                    <div className="mt-4 p-3 bg-info/10 rounded-lg">
+                      <p className="text-sm text-info-content">
+                        💬 디자이너가 작업물을 업로드하면 검토 후 피드백을 남길 수 있습니다.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="mt-4 text-center">
-                <button className="btn btn-outline btn-lg">
-                  📦 전체 파일 일괄 다운로드
-                </button>
+              {/* 3단계: 최종 결과물 */}
+              <div className="card bg-gradient-to-r from-neutral/5 to-neutral/10 shadow-sm">
+                <div className="card-body">
+                  <div className="flex items-center space-x-3 mb-6">
+                    <div className="w-8 h-8 bg-neutral text-neutral-content rounded-full flex items-center justify-center font-bold">3</div>
+                    <div>
+                      <h4 className="text-lg font-semibold">최종 결과물</h4>
+                      <p className="text-sm text-base-content/70">2024.02.10 - 2024.02.15 (예정)</p>
+                    </div>
+                    <div className="badge badge-neutral">대기중</div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div className="bg-base-100 p-4 rounded-lg border-2 border-dashed border-neutral">
+                        <div className="w-full h-48 bg-neutral/10 rounded flex items-center justify-center">
+                          <div className="text-center">
+                            <div className="text-4xl mb-2">📦</div>
+                            <p className="text-sm font-medium">완성된 로고 패키지</p>
+                            <p className="text-xs text-base-content/60">AI, PNG, SVG 파일</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="bg-base-100 p-4 rounded-lg border-2 border-dashed border-neutral">
+                        <div className="w-full h-48 bg-neutral/10 rounded flex items-center justify-center">
+                          <div className="text-center">
+                            <div className="text-4xl mb-2">📋</div>
+                            <p className="text-sm font-medium">브랜드 가이드라인</p>
+                            <p className="text-xs text-base-content/60">사용법 및 규정</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {userRole === "designer" && (
+                    <div className="mt-4 p-4 border-2 border-dashed border-neutral/30 rounded-lg bg-neutral/5">
+                      <div className="flex items-center justify-between mb-3">
+                        <h5 className="text-sm font-medium flex items-center space-x-2">
+                          <span>📎</span>
+                          <span>최종 결과물 업로드</span>
+                        </h5>
+                      </div>
+                      <div className="space-y-3">
+                        <select 
+                          className="select select-sm select-bordered w-full"
+                          value={uploadMetadata.final.fileType}
+                          onChange={(e) => setUploadMetadata(prev => ({
+                            ...prev,
+                            final: { ...prev.final, fileType: e.target.value }
+                          }))}
+                        >
+                          <option disabled value="general">결과물 유형을 선택하세요</option>
+                          <option value="logo-package">완성된 로고 패키지</option>
+                          <option value="brand-guideline">브랜드 가이드라인</option>
+                          <option value="source-files">소스 파일 (AI/PSD)</option>
+                          <option value="print-ready">인쇄용 파일</option>
+                          <option value="web-ready">웹용 파일</option>
+                          <option value="other">기타</option>
+                        </select>
+                        <input 
+                          type="text" 
+                          placeholder="결과물 이름 (예: 최종 로고 패키지 v1.0)" 
+                          className="input input-sm input-bordered w-full"
+                          value={uploadMetadata.final.title}
+                          onChange={(e) => setUploadMetadata(prev => ({
+                            ...prev,
+                            final: { ...prev.final, title: e.target.value }
+                          }))}
+                        />
+                        <textarea 
+                          placeholder="결과물 설명 (예: AI, PNG, SVG 포함, 다양한 사이즈별 파일)" 
+                          className="textarea textarea-sm textarea-bordered w-full h-16"
+                          value={uploadMetadata.final.description}
+                          onChange={(e) => setUploadMetadata(prev => ({
+                            ...prev,
+                            final: { ...prev.final, description: e.target.value }
+                          }))}
+                        />
+                        <div className="flex space-x-2">
+                          <input
+                            type="file"
+                            id="final-file-input"
+                            className="hidden"
+                            multiple
+                            accept="image/*,.pdf,.ai,.psd,.zip"
+                            onChange={handleFileSelect('final')}
+                          />
+                          <button 
+                            className="btn btn-success btn-sm"
+                            onClick={() => document.getElementById('final-file-input')?.click()}
+                          >
+                            <span>📁</span>
+                            파일 선택
+                            {finalFiles.length > 0 && ` (${finalFiles.length}개)`}
+                          </button>
+                          <button 
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => handleUpload('final', uploadMetadata.final.title, uploadMetadata.final.description, uploadMetadata.final.fileType)}
+                            disabled={uploadingStage === 'final'}
+                          >
+                            {uploadingStage === 'final' ? (
+                              <>
+                                <span className="loading loading-spinner loading-sm"></span>
+                                업로드 중...
+                              </>
+                            ) : (
+                              '최종 제출'
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="mt-4 p-3 bg-info/10 rounded-lg">
+                    <div className="flex items-start space-x-2">
+                      <span className="text-info">ℹ️</span>
+                      <p className="text-sm text-info-content">
+                        {userRole === "designer" 
+                          ? "중간 작업물 승인 후 최종 결과물을 업로드할 수 있습니다."
+                          : "중간 작업물 승인 후 최종 결과물 제작이 시작됩니다. 예상 완료일: 2024년 2월 15일"
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+
+            {/* 추가 파일 업로드 */}
+            <div className="card bg-base-100 shadow-sm">
+              <div className="card-body">
+                <h4 className="font-medium mb-4">📁 추가 파일 업로드</h4>
+                <FileUpload
+                  onFilesUpload={handleFilesUpload}
+                  onFileRemove={handleFileRemove}
+                  maxFileSize={50}
+                  maxFiles={20}
+                  multiple={true}
+                  existingFiles={[]}
+                  acceptedTypes={[
+                    "image/jpeg",
+                    "image/png",
+                    "image/gif",
+                    "image/webp",
+                    "application/pdf",
+                    "application/vnd.adobe.illustrator",
+                    "application/x-photoshop",
+                    "application/zip",
+                    "text/plain",
+                  ]}
+                />
+              </div>
+            </div>
+
+            {/* 이미지 주석 기능 */}
+            <div className="card bg-base-100 shadow-sm">
+              <div className="card-body">
+                <h4 className="font-medium mb-4 flex items-center space-x-2">
+                  <span className="text-xl">🖼️</span>
+                  <span>로고 초안 V2 - 주석 기능</span>
+                  <div className="badge badge-primary">최신</div>
+                </h4>
+                
+                {/* 간단한 이미지 표시 (스피너 없이) */}
+                <div className="relative">
+                  <img 
+                    src="https://picsum.photos/800/600?random=2" 
+                    alt="로고 초안 V2"
+                    className="w-full max-w-2xl h-auto rounded-lg border border-base-300"
+                  />
+                  
+                  {/* 모의 주석 표시 */}
+                  <div className="absolute top-4 left-4 bg-success text-success-content px-2 py-1 rounded-full text-xs font-medium">
+                    ✓ 색상 승인됨
+                  </div>
+                  <div className="absolute bottom-4 right-4 bg-warning text-warning-content px-2 py-1 rounded-full text-xs font-medium">
+                    ! 폰트 크기 조정 필요
+                  </div>
+                </div>
+                
+                <div className="mt-4 space-y-3">
+                  {/* 주석 목록 */}
+                  <div className="p-3 bg-success/10 border-l-4 border-success rounded">
+                    <div className="flex items-start space-x-2">
+                      <span className="text-success">✓</span>
+                      <div>
+                        <p className="text-sm font-medium">색상이 좋습니다! 이 톤을 유지해주세요.</p>
+                        <p className="text-xs text-base-content/60 mt-1">클라이언트 · 해결됨</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="p-3 bg-warning/10 border-l-4 border-warning rounded">
+                    <div className="flex items-start space-x-2">
+                      <span className="text-warning">!</span>
+                      <div>
+                        <p className="text-sm font-medium">폰트 크기를 조금 더 키워주실 수 있나요?</p>
+                        <p className="text-xs text-base-content/60 mt-1">클라이언트 · 검토 중</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mt-4 p-3 bg-base-200 rounded-lg">
+                  <div className="flex items-start space-x-2 text-sm">
+                    <span className="text-lg">💡</span>
+                    <div>
+                      <p className="font-medium mb-1">주석 기능 사용법</p>
+                      <ul className="text-base-content/70 space-y-1">
+                        <li>• 이미지를 클릭하여 주석을 추가할 수 있습니다</li>
+                        <li>• {userRole === "client" ? "클라이언트는 주석 추가 및 수정이 가능합니다" : "디자이너는 주석을 확인하고 답변할 수 있습니다"}</li>
+                        <li>• 주석 상태: 🔴 검토 중, 🟢 해결됨</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 상세 파일 목록 */}
+            <div className="card bg-base-100 shadow-sm">
+              <div className="card-body">
+                <h4 className="font-medium mb-4 flex items-center justify-between">
+                  <span className="flex items-center space-x-2">
+                    <span className="text-xl">📋</span>
+                    <span>전체 파일 목록</span>
+                  </span>
+                  <div className="text-sm text-base-content/60">
+                    {(() => {
+                      const filteredFiles = getFilteredAndSortedFiles();
+                      return `${filteredFiles.length}개 파일 • ${Math.round(filteredFiles.reduce((acc, f) => acc + f.size, 0) / 1024 / 1024)}MB`;
+                    })()}
+                  </div>
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="table table-sm">
+                    <thead>
+                      <tr>
+                        <th>파일명</th>
+                        <th>종류</th>
+                        <th>크기</th>
+                        <th>업로드일</th>
+                        <th>상태</th>
+                        <th>작업</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {getFilteredAndSortedFiles().length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="text-center py-8">
+                            <div className="text-base-content/50">
+                              <div className="text-4xl mb-2">🔍</div>
+                              <p className="font-medium">검색 결과가 없습니다</p>
+                              <p className="text-sm">다른 검색어를 입력하거나 필터를 변경해보세요</p>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        getFilteredAndSortedFiles().map((file, index) => {
+                        const uploadDate = new Date(2024, 0, 15 + index * 2); // Mock dates
+                        const getFileCategory = (name: string) => {
+                          if (name.includes('logo_design')) return { label: '디자인 초안', color: 'badge-primary' };
+                          if (name.includes('intermediate')) return { label: '중간 보고서', color: 'badge-warning' };
+                          if (name.includes('guideline') || name.includes('deliverables')) return { label: '최종 결과물', color: 'badge-success' };
+                          return { label: '기타', color: 'badge-neutral' };
+                        };
+                        const category = getFileCategory(file.name);
+                        
+                        return (
+                          <tr key={file.id} className="hover">
+                            <td>
+                              <div className="flex items-center space-x-3">
+                                {file.preview ? (
+                                  <img src={file.preview} alt={file.name} className="w-8 h-8 object-cover rounded" />
+                                ) : (
+                                  <div className="w-8 h-8 bg-base-300 rounded flex items-center justify-center text-sm">
+                                    {file.type === 'application/pdf' ? '📄' : file.type.includes('zip') ? '📦' : '📁'}
+                                  </div>
+                                )}
+                                <div className="font-medium">{file.name}</div>
+                              </div>
+                            </td>
+                            <td>
+                              <div className={`badge ${category.color} badge-sm`}>
+                                {category.label}
+                              </div>
+                            </td>
+                            <td className="text-sm">{Math.round(file.size / 1024)}KB</td>
+                            <td className="text-sm">{uploadDate.toLocaleDateString()}</td>
+                            <td>
+                              <div className="badge badge-success badge-sm">✓ 완료</div>
+                            </td>
+                            <td>
+                              <div className="flex space-x-1">
+                                {file.preview && (
+                                  <button 
+                                    className="btn btn-ghost btn-xs" 
+                                    title="미리보기"
+                                    onClick={() => setSelectedImage({
+                                      src: file.preview || '',
+                                      alt: file.name,
+                                      title: file.name,
+                                      description: `${category.label} • ${Math.round(file.size / 1024)}KB • ${uploadDate.toLocaleDateString()}`
+                                    })}
+                                  >👁️</button>
+                                )}
+                                <button 
+                                  className="btn btn-ghost btn-xs" 
+                                  title="다운로드"
+                                  onClick={() => handleFileDownload(file)}
+                                >⬇️</button>
+                                <button 
+                                  className="btn btn-ghost btn-xs" 
+                                  title="공유"
+                                  onClick={() => handleFileShare(file)}
+                                >🔗</button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        );
 
-        <div className="p-6 border-t bg-base-50">
-          <div className="flex justify-end gap-3">
-            <button className="btn btn-ghost" onClick={onClose}>
-              닫기
-            </button>
-            {project.status === "completion_requested" &&
-              userRole === "client" && (
-                <>
-                  <button className="btn btn-warning">↩️ 수정 요청</button>
+      case "history":
+        return (
+          <div className="space-y-6">
+            <h3 className="text-lg font-semibold">버전 히스토리</h3>
+
+            {feedbacks.length > 0 && (
+              <div className="tabs tabs-boxed">
+                {feedbacks.map((feedback) => (
                   <button
-                    className="btn btn-success btn-lg"
-                    onClick={handleApproveCompletion}
+                    key={feedback.id}
+                    className="tab"
+                    onClick={() => setActiveTab(`history-${feedback.id}`)}
                   >
-                    ✅ 최종 승인 및 완료
+                    피드백 #{feedback.id.slice(-3)}
                   </button>
-                </>
-              )}
+                ))}
+              </div>
+            )}
+
+            {activeTab.startsWith("history-") ? (
+              <FeedbackVersionHistory
+                feedbackId={activeTab.replace("history-", "")}
+                onVersionRestore={(version) => {
+                  console.log(`버전 ${version}으로 복원`);
+                }}
+                showActions={true}
+              />
+            ) : (
+              <div className="text-center py-12">
+                <div className="text-6xl mb-4">📜</div>
+                <h3 className="text-xl font-bold mb-2">피드백을 선택하세요</h3>
+                <p className="text-base-content/60">
+                  위의 탭에서 피드백을 선택하면 버전 히스토리를 확인할 수
+                  있습니다.
+                </p>
+              </div>
+            )}
           </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+        );
 
-// 리뷰 작성 모달 컴포넌트
-function ReviewModal({
-  project,
-  userRole,
-  onClose,
-}: {
-  project: Project;
-  userRole: "client" | "designer";
-  onClose: () => void;
-}) {
-  const [ratings, setRatings] = useState({
-    overall: 0,
-    professionalism: 0,
-    communication: 0,
-    deadline: 0,
-    satisfaction: 0,
-  });
-  const [reviewText, setReviewText] = useState("");
-  const [isAnonymous, setIsAnonymous] = useState(false);
-
-  const ratingLabels = {
-    overall: "전체 평점",
-    professionalism: "전문성",
-    communication: "소통 능력",
-    deadline: "마감일 준수",
-    satisfaction: userRole === "client" ? "결과물 만족도" : "협업 만족도",
-  };
-
-  const handleRatingChange = (
-    category: keyof typeof ratings,
-    value: number
-  ) => {
-    setRatings((prev) => ({ ...prev, [category]: value }));
-  };
-
-  const handleSubmit = () => {
-    const unratedCategories = Object.entries(ratings).filter(
-      ([_, rating]) => rating === 0
-    );
-
-    if (unratedCategories.length > 0) {
-      alert("모든 항목에 평점을 매겨주세요.");
-      return;
-    }
-
-    if (confirm("리뷰를 제출하시겠습니까?")) {
-      // 실제로는 API 호출
-      alert("리뷰가 성공적으로 제출되었습니다!");
-      onClose();
+      default:
+        return <div>탭을 선택하세요</div>;
     }
   };
 
-  const StarRating = ({
-    rating,
-    onRatingChange,
-  }: {
-    rating: number;
-    onRatingChange: (rating: number) => void;
-  }) => (
-    <div className="flex gap-1">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <button
-          key={star}
-          className={`text-2xl transition-colors ${
-            star <= rating ? "text-yellow-400" : "text-gray-300"
-          }`}
-          onClick={() => onRatingChange(star)}
-        >
-          ⭐
-        </button>
-      ))}
-    </div>
-  );
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-base-100 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
-        <div className="p-6 border-b">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold">
-              {userRole === "client" ? "디자이너" : "클라이언트"} 리뷰 작성
-            </h2>
-            <button
-              className="btn btn-sm btn-circle btn-ghost"
-              onClick={onClose}
-            >
-              ✕
-            </button>
-          </div>
-        </div>
+    <AuthWrapper requireAuth>
+      <DashboardLayout title={project.name} userRole={userRole}>
+        <div className="space-y-6">
+          {/* 프로젝트 헤더 */}
+          <div className="card bg-base-100 shadow-sm">
+            <div className="card-body">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h1 className="text-2xl font-bold mb-2">{project.name}</h1>
+                  <p className="text-base-content/70 mb-4">
+                    {project.description}
+                  </p>
 
-        <div className="p-6 overflow-y-auto max-h-[70vh]">
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-bold mb-4">평점 매기기</h3>
-              <div className="space-y-4">
-                {Object.entries(ratingLabels).map(([key, label]) => (
-                  <div key={key} className="flex items-center justify-between">
-                    <span className="font-medium">{label}</span>
-                    <StarRating
-                      rating={ratings[key as keyof typeof ratings]}
-                      onRatingChange={(rating) =>
-                        handleRatingChange(key as keyof typeof ratings, rating)
-                      }
-                    />
+                  <div className="flex items-center space-x-4 text-sm">
+                    <span
+                      className={`badge badge-${statusInfo.color} badge-lg`}
+                    >
+                      {statusInfo.icon} {statusInfo.label}
+                    </span>
+                    <span>진행률: {progress}%</span>
+                    <span>
+                      마감: {new Date(project.end_date).toLocaleDateString()}
+                    </span>
                   </div>
-                ))}
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => router.push("/projects")}
+                    className="btn btn-ghost"
+                  >
+                    ← 목록으로
+                  </button>
+                </div>
               </div>
             </div>
+          </div>
 
-            <div>
-              <h3 className="text-lg font-bold mb-4">상세 리뷰 (선택사항)</h3>
-              <textarea
-                className="textarea textarea-bordered w-full h-32"
-                placeholder="이번 프로젝트에 대한 구체적인 의견을 남겨주세요..."
-                value={reviewText}
-                onChange={(e) => setReviewText(e.target.value)}
-              />
-              <div className="text-sm text-base-content/60 mt-2">
-                {reviewText.length}/500자
+          {/* 탭 네비게이션 */}
+          <div className="tabs tabs-boxed justify-start">
+            <button
+              className={`tab tab-lg ${
+                activeTab === "overview" ? "tab-active" : ""
+              }`}
+              onClick={() => setActiveTab("overview")}
+            >
+              📊 개요
+            </button>
+            <button
+              className={`tab tab-lg ${
+                activeTab === "feedback" ? "tab-active" : ""
+              }`}
+              onClick={() => setActiveTab("feedback")}
+            >
+              💬 피드백 ({feedbacks.length})
+            </button>
+            <button
+              className={`tab tab-lg ${
+                activeTab === "files" ? "tab-active" : ""
+              }`}
+              onClick={() => setActiveTab("files")}
+            >
+              📁 파일
+            </button>
+            <button
+              className={`tab tab-lg ${
+                activeTab === "history" ? "tab-active" : ""
+              }`}
+              onClick={() => setActiveTab("history")}
+            >
+              📜 히스토리
+            </button>
+          </div>
+
+          {/* 탭 내용 */}
+          {renderTabContent()}
+        </div>
+
+        {/* 이미지 미리보기 모달 */}
+        {selectedImage && (
+          <div className="modal modal-open">
+            <div className="modal-box max-w-4xl">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-lg">{selectedImage.title}</h3>
+                <button 
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setSelectedImage(null)}
+                >
+                  ✕
+                </button>
               </div>
-            </div>
-
-            <div className="form-control">
-              <label className="label cursor-pointer">
-                <span className="label-text">익명으로 리뷰 작성</span>
-                <input
-                  type="checkbox"
-                  className="checkbox"
-                  checked={isAnonymous}
-                  onChange={(e) => setIsAnonymous(e.target.checked)}
+              
+              <div className="flex flex-col items-center">
+                <img 
+                  src={selectedImage.src} 
+                  alt={selectedImage.alt}
+                  className="max-w-full max-h-96 object-contain rounded-lg shadow-lg"
                 />
-              </label>
+                
+                {selectedImage.description && (
+                  <p className="text-sm text-base-content/70 mt-3 text-center">
+                    {selectedImage.description}
+                  </p>
+                )}
+                
+                <div className="flex space-x-2 mt-4">
+                  <button 
+                    className="btn btn-primary btn-sm"
+                    onClick={() => {
+                      const mockFile = { name: selectedImage.title || selectedImage.alt };
+                      handleFileDownload(mockFile);
+                    }}
+                  >
+                    ⬇️ 다운로드
+                  </button>
+                  <button 
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      const mockFile = { 
+                        id: `preview-${Date.now()}`,
+                        name: selectedImage.title || selectedImage.alt 
+                      };
+                      handleFileShare(mockFile);
+                    }}
+                  >
+                    🔗 공유
+                  </button>
+                  <button 
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setSelectedImage(null)}
+                  >
+                    닫기
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="modal-backdrop" onClick={() => setSelectedImage(null)}>
             </div>
           </div>
-        </div>
-
-        <div className="p-6 border-t bg-base-50">
-          <div className="flex justify-end gap-3">
-            <button className="btn btn-ghost" onClick={onClose}>
-              취소
-            </button>
-            <button className="btn btn-primary btn-lg" onClick={handleSubmit}>
-              ⭐ 리뷰 제출
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+        )}
+      </DashboardLayout>
+    </AuthWrapper>
   );
 }

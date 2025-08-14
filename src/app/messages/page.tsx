@@ -1,7 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { useAuth } from "@/hooks/useAuth";
+import AuthWrapper from "@/components/auth/AuthWrapper";
+import { UserRole } from "@/types";
+import { useRouter, useSearchParams } from "next/navigation";
 
 // 메시지 관련 타입 정의
 interface Message {
@@ -42,12 +46,12 @@ const mockConversations: Conversation[] = [
   {
     id: "1",
     participant: {
-      id: "designer-1",
+      id: "1",
       name: "김디자이너",
       avatar: "김",
     },
     project: {
-      id: "project-1",
+      id: "1",
       name: "로고 프로젝트",
       color: "primary",
     },
@@ -95,12 +99,12 @@ const mockConversations: Conversation[] = [
   {
     id: "2",
     participant: {
-      id: "designer-2",
+      id: "2",
       name: "이디자이너",
       avatar: "이",
     },
     project: {
-      id: "project-2",
+      id: "2",
       name: "웹사이트 프로젝트",
       color: "secondary",
     },
@@ -129,12 +133,12 @@ const mockConversations: Conversation[] = [
   {
     id: "3",
     participant: {
-      id: "designer-3",
+      id: "3",
       name: "박디자이너",
       avatar: "박",
     },
     project: {
-      id: "project-3",
+      id: "3",
       name: "브랜딩 프로젝트",
       color: "accent",
     },
@@ -163,7 +167,11 @@ const mockConversations: Conversation[] = [
 ];
 
 export default function MessagesPage() {
-  const userRole = "client" as const;
+  const { user } = useAuth();
+  const userRole: UserRole = user?.role ?? user?.userType ?? "client";
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const initializedRef = useRef(false);
 
   // 검색 및 필터 상태
   const [searchTerm, setSearchTerm] = useState("");
@@ -171,10 +179,40 @@ export default function MessagesPage() {
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [projectFilter, setProjectFilter] = useState("all");
   const [messageSearchTerm, setMessageSearchTerm] = useState("");
+  const [newMessage, setNewMessage] = useState("");
+  const [conversations, setConversations] = useState<Conversation[]>(mockConversations);
+  // 1) 쿼리 → 상태 초기화(최초 1회)
+  useEffect(() => {
+    if (initializedRef.current) return;
+    const conv = searchParams.get("conversation");
+    const onlyUnread = searchParams.get("unread");
+    const project = searchParams.get("project");
+    const q = searchParams.get("q");
+
+    if (conv) setSelectedConversation(conv);
+    if (onlyUnread === "1") setShowUnreadOnly(true);
+    if (project) setProjectFilter(project);
+    if (q) setSearchTerm(q);
+
+    initializedRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 2) 상태 → 쿼리 동기화
+  useEffect(() => {
+    if (!initializedRef.current) return;
+    const next = new URLSearchParams();
+    if (selectedConversation) next.set("conversation", selectedConversation);
+    if (showUnreadOnly) next.set("unread", "1");
+    if (projectFilter !== "all") next.set("project", projectFilter);
+    if (searchTerm) next.set("q", searchTerm);
+    const query = next.toString();
+    router.replace(query ? `/messages?${query}` : "/messages");
+  }, [selectedConversation, showUnreadOnly, projectFilter, searchTerm, router]);
 
   // 필터링된 대화 목록
   const filteredConversations = useMemo(() => {
-    let filtered = mockConversations.filter((conversation) => {
+    let filtered = conversations.filter((conversation) => {
       // 읽지 않은 메시지만 보기 필터
       if (showUnreadOnly && conversation.unreadCount === 0) {
         return false;
@@ -217,10 +255,10 @@ export default function MessagesPage() {
     );
 
     return filtered;
-  }, [searchTerm, showUnreadOnly, projectFilter]);
+  }, [conversations, searchTerm, showUnreadOnly, projectFilter]);
 
   // 선택된 대화의 메시지 필터링
-  const currentConversation = mockConversations.find(
+  const currentConversation = conversations.find(
     (c) => c.id === selectedConversation
   );
   const filteredMessages = useMemo(() => {
@@ -271,387 +309,463 @@ export default function MessagesPage() {
     setMessageSearchTerm("");
   };
 
-  const totalUnreadCount = mockConversations.reduce(
+  const totalUnreadCount = conversations.reduce(
     (sum, conv) => sum + conv.unreadCount,
     0
   );
 
-  return (
-    <DashboardLayout title="메시지" userRole={userRole}>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
-        {/* 대화 목록 */}
-        <div className="lg:col-span-1">
-          <div className="card bg-base-100 shadow-sm h-full">
-            <div className="card-body p-0">
-              <div className="p-4 border-b border-base-300">
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="card-title">
-                    대화 목록
-                    {totalUnreadCount > 0 && (
-                      <span className="badge badge-primary">
-                        {totalUnreadCount}
-                      </span>
-                    )}
-                  </h2>
-                  {(searchTerm ||
-                    showUnreadOnly ||
-                    projectFilter !== "all") && (
-                    <button
-                      className="btn btn-ghost btn-xs"
-                      onClick={clearFilters}
-                    >
-                      🗑️ 초기화
-                    </button>
-                  )}
-                </div>
+  // 메시지 전송 함수
+  const handleSendMessage = () => {
+    if (!newMessage.trim() || !currentConversation) return;
 
-                {/* 검색 */}
-                <div className="space-y-2">
-                  <div className="input-group input-group-sm">
-                    <input
-                      type="text"
-                      placeholder="대화 상대, 프로젝트, 메시지 검색..."
-                      className="input input-bordered input-sm flex-1"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                    {searchTerm && (
+    const newMsg: Message = {
+      id: `msg-${Date.now()}`,
+      sender: "me",
+      content: newMessage.trim(),
+      timestamp: new Date().toISOString(),
+    };
+
+    setConversations(prev => prev.map(conv => {
+      if (conv.id === selectedConversation) {
+        return {
+          ...conv,
+          messages: [...conv.messages, newMsg],
+          lastMessage: {
+            content: newMsg.content,
+            timestamp: newMsg.timestamp,
+            sender: "me"
+          }
+        };
+      }
+      return conv;
+    }));
+
+    setNewMessage("");
+    
+    // 자동 응답 시뮬레이션 (3초 후)
+    setTimeout(() => {
+      const autoReply: Message = {
+        id: `msg-${Date.now() + 1}`,
+        sender: "other",
+        content: `${newMessage.trim()}에 대한 답변입니다. 확인했습니다!`,
+        timestamp: new Date().toISOString(),
+      };
+
+      setConversations(prev => prev.map(conv => {
+        if (conv.id === selectedConversation) {
+          return {
+            ...conv,
+            messages: [...conv.messages, autoReply],
+            lastMessage: {
+              content: autoReply.content,
+              timestamp: autoReply.timestamp,
+              sender: "other"
+            },
+            unreadCount: conv.unreadCount + 1
+          };
+        }
+        return conv;
+      }));
+    }, 3000);
+  };
+
+  return (
+    <AuthWrapper requireAuth>
+      <DashboardLayout title="메시지" userRole={userRole}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
+          {/* 대화 목록 */}
+          <div className="lg:col-span-1">
+            <div className="card bg-base-100 shadow-sm h-full">
+              <div className="card-body p-0">
+                <div className="p-4 border-b border-base-300">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="card-title">
+                      대화 목록
+                      {totalUnreadCount > 0 && (
+                        <span className="badge badge-primary">
+                          {totalUnreadCount}
+                        </span>
+                      )}
+                    </h2>
+                    {(searchTerm ||
+                      showUnreadOnly ||
+                      projectFilter !== "all") && (
                       <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => setSearchTerm("")}
+                        className="btn btn-ghost btn-xs"
+                        onClick={clearFilters}
                       >
-                        ✕
+                        🗑️ 초기화
                       </button>
                     )}
                   </div>
 
-                  {/* 필터 */}
-                  <div className="flex gap-2">
-                    <select
-                      className="select select-bordered select-xs flex-1"
-                      value={projectFilter}
-                      onChange={(e) => setProjectFilter(e.target.value)}
-                    >
-                      <option value="all">모든 프로젝트</option>
-                      <option value="project-1">로고 프로젝트</option>
-                      <option value="project-2">웹사이트 프로젝트</option>
-                      <option value="project-3">브랜딩 프로젝트</option>
-                    </select>
-
-                    <button
-                      className={`btn btn-xs ${
-                        showUnreadOnly ? "btn-primary" : "btn-outline"
-                      }`}
-                      onClick={() => setShowUnreadOnly(!showUnreadOnly)}
-                    >
-                      읽지 않음
-                    </button>
-                  </div>
-
-                  {/* 검색 결과 요약 */}
-                  {(searchTerm ||
-                    showUnreadOnly ||
-                    projectFilter !== "all") && (
-                    <div className="text-xs text-base-content/60">
-                      {filteredConversations.length}개의 대화
-                      {searchTerm && ` · "${searchTerm}" 검색`}
-                      {showUnreadOnly && " · 읽지 않음만"}
-                      {projectFilter !== "all" && " · 프로젝트 필터"}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto">
-                {filteredConversations.length === 0 ? (
-                  <div className="text-center py-8">
-                    <div className="text-4xl mb-2">
-                      {showUnreadOnly ? "📬" : searchTerm ? "🔍" : "💬"}
-                    </div>
-                    <p className="text-sm text-base-content/60">
-                      {showUnreadOnly
-                        ? "읽지 않은 메시지가 없습니다"
-                        : searchTerm
-                        ? "검색 결과가 없습니다"
-                        : "대화가 없습니다"}
-                    </p>
-                  </div>
-                ) : (
-                  filteredConversations.map((conversation) => (
-                    <div
-                      key={conversation.id}
-                      className={`flex items-center space-x-3 p-4 hover:bg-base-200 cursor-pointer transition-colors ${
-                        selectedConversation === conversation.id
-                          ? "border-l-4 border-primary bg-base-200"
-                          : ""
-                      }`}
-                      onClick={() => setSelectedConversation(conversation.id)}
-                    >
-                      <div className="avatar">
-                        <div
-                          className={`w-12 rounded-full bg-${conversation.project.color} text-${conversation.project.color}-content flex items-center justify-center`}
-                        >
-                          <span className="text-sm">
-                            {conversation.participant.avatar}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <p className="font-medium truncate">
-                            {conversation.participant.name}
-                          </p>
-                          <span className="text-xs text-base-content/60">
-                            {formatTime(conversation.lastMessage.timestamp)}
-                          </span>
-                        </div>
-                        <p
-                          className={`text-sm truncate ${
-                            conversation.unreadCount > 0
-                              ? "font-medium text-base-content"
-                              : "text-base-content/60"
-                          }`}
-                        >
-                          {conversation.lastMessage.sender === "me" && "나: "}
-                          {conversation.lastMessage.content}
-                        </p>
-                        <div className="flex items-center justify-between mt-1">
-                          <span
-                            className={`text-xs bg-${conversation.project.color} text-${conversation.project.color}-content px-2 py-1 rounded`}
-                          >
-                            {conversation.project.name}
-                          </span>
-                          {conversation.unreadCount > 0 && (
-                            <span className="badge badge-primary badge-xs">
-                              {conversation.unreadCount}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 대화 영역 */}
-        <div className="lg:col-span-2">
-          <div className="card bg-base-100 shadow-sm h-full">
-            <div className="card-body p-0 flex flex-col">
-              {/* 대화 헤더 */}
-              <div className="p-4 border-b border-base-300">
-                <div className="flex items-center justify-between mb-3">
-                  {currentConversation ? (
-                    <div className="flex items-center space-x-3">
-                      <div className="avatar">
-                        <div
-                          className={`w-10 rounded-full bg-${currentConversation.project.color} text-${currentConversation.project.color}-content flex items-center justify-center`}
-                        >
-                          <span className="text-sm">
-                            {currentConversation.participant.avatar}
-                          </span>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="font-medium">
-                          {currentConversation.participant.name}
-                        </p>
-                        <p className="text-xs text-base-content/60">
-                          {currentConversation.project.name}
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-full bg-base-300"></div>
-                      <div>
-                        <p className="font-medium">대화를 선택해주세요</p>
-                        <p className="text-xs text-base-content/60">메시지</p>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex items-center space-x-2">
-                    {currentConversation && (
-                      <>
-                        <button className="btn btn-ghost btn-sm">
-                          📹 화상통화
-                        </button>
-                        <button className="btn btn-ghost btn-sm">
-                          📋 프로젝트 보기
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* 메시지 검색 */}
-                {currentConversation && (
-                  <div className="input-group input-group-sm">
-                    <input
-                      type="text"
-                      placeholder="메시지 내용 검색..."
-                      className="input input-bordered input-sm flex-1"
-                      value={messageSearchTerm}
-                      onChange={(e) => setMessageSearchTerm(e.target.value)}
-                    />
-                    {messageSearchTerm && (
-                      <>
+                  {/* 검색 */}
+                  <div className="space-y-2">
+                    <div className="input-group input-group-sm">
+                      <input
+                        type="text"
+                        placeholder="대화 상대, 프로젝트, 메시지 검색..."
+                        className="input input-bordered input-sm flex-1"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                      {searchTerm && (
                         <button
                           className="btn btn-ghost btn-sm"
-                          onClick={() => setMessageSearchTerm("")}
+                          onClick={() => setSearchTerm("")}
                         >
                           ✕
                         </button>
-                        <span className="btn btn-ghost btn-sm pointer-events-none">
-                          {filteredMessages.length}개 결과
-                        </span>
-                      </>
+                      )}
+                    </div>
+
+                    {/* 필터 */}
+                    <div className="flex gap-2">
+                      <select
+                        className="select select-bordered select-xs flex-1"
+                        value={projectFilter}
+                        onChange={(e) => setProjectFilter(e.target.value)}
+                      >
+                        <option value="all">모든 프로젝트</option>
+                        <option value="1">로고 프로젝트</option>
+                        <option value="2">웹사이트 프로젝트</option>
+                        <option value="3">브랜딩 프로젝트</option>
+                      </select>
+
+                      <button
+                        className={`btn btn-xs ${
+                          showUnreadOnly ? "btn-primary" : "btn-outline"
+                        }`}
+                        onClick={() => setShowUnreadOnly(!showUnreadOnly)}
+                      >
+                        읽지 않음
+                      </button>
+                    </div>
+
+                    {/* 검색 결과 요약 */}
+                    {(searchTerm ||
+                      showUnreadOnly ||
+                      projectFilter !== "all") && (
+                      <div className="text-xs text-base-content/60">
+                        {filteredConversations.length}개의 대화
+                        {searchTerm && ` · "${searchTerm}" 검색`}
+                        {showUnreadOnly && " · 읽지 않음만"}
+                        {projectFilter !== "all" && " · 프로젝트 필터"}
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
+                </div>
 
-              {/* 메시지 영역 */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {!currentConversation ? (
-                  <div className="text-center py-12">
-                    <div className="text-6xl mb-4">💬</div>
-                    <h3 className="text-xl font-bold mb-2">
-                      대화를 선택해주세요
-                    </h3>
-                    <p className="text-base-content/60">
-                      왼쪽에서 대화를 선택하면 메시지를 확인할 수 있습니다.
-                    </p>
-                  </div>
-                ) : filteredMessages.length === 0 && messageSearchTerm ? (
-                  <div className="text-center py-12">
-                    <div className="text-6xl mb-4">🔍</div>
-                    <h3 className="text-xl font-bold mb-2">
-                      검색 결과가 없습니다
-                    </h3>
-                    <p className="text-base-content/60">
-                      "{messageSearchTerm}"에 대한 메시지를 찾을 수 없습니다.
-                    </p>
-                  </div>
-                ) : (
-                  filteredMessages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex items-start space-x-3 ${
-                        message.sender === "me" ? "justify-end" : ""
-                      }`}
-                    >
-                      {message.sender === "other" && (
+                <div className="flex-1 overflow-y-auto">
+                  {filteredConversations.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="text-4xl mb-2">
+                        {showUnreadOnly ? "📬" : searchTerm ? "🔍" : "💬"}
+                      </div>
+                      <p className="text-sm text-base-content/60">
+                        {showUnreadOnly
+                          ? "읽지 않은 메시지가 없습니다"
+                          : searchTerm
+                          ? "검색 결과가 없습니다"
+                          : "대화가 없습니다"}
+                      </p>
+                    </div>
+                  ) : (
+                    filteredConversations.map((conversation) => (
+                      <div
+                        key={conversation.id}
+                        className={`flex items-center space-x-3 p-4 hover:bg-base-200 cursor-pointer transition-colors ${
+                          selectedConversation === conversation.id
+                            ? "border-l-4 border-primary bg-base-200"
+                            : ""
+                        }`}
+                        onClick={() => setSelectedConversation(conversation.id)}
+                      >
                         <div className="avatar">
                           <div
-                            className={`w-8 rounded-full bg-${currentConversation.project.color} text-${currentConversation.project.color}-content flex items-center justify-center`}
+                            className={`w-12 rounded-full bg-${conversation.project.color} text-${conversation.project.color}-content flex items-center justify-center`}
                           >
-                            <span className="text-xs">
+                            <span className="text-sm">
+                              {conversation.participant.avatar}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <p className="font-medium truncate">
+                              {conversation.participant.name}
+                            </p>
+                            <span className="text-xs text-base-content/60">
+                              {formatTime(conversation.lastMessage.timestamp)}
+                            </span>
+                          </div>
+                          <p
+                            className={`text-sm truncate ${
+                              conversation.unreadCount > 0
+                                ? "font-medium text-base-content"
+                                : "text-base-content/60"
+                            }`}
+                          >
+                            {conversation.lastMessage.sender === "me" && "나: "}
+                            {conversation.lastMessage.content}
+                          </p>
+                          <div className="flex items-center justify-between mt-1">
+                            <span
+                              className={`text-xs bg-${conversation.project.color} text-${conversation.project.color}-content px-2 py-1 rounded`}
+                            >
+                              {conversation.project.name}
+                            </span>
+                            {conversation.unreadCount > 0 && (
+                              <span className="badge badge-primary badge-xs">
+                                {conversation.unreadCount}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 대화 영역 */}
+          <div className="lg:col-span-2">
+            <div className="card bg-base-100 shadow-sm h-full">
+              <div className="card-body p-0 flex flex-col">
+                {/* 대화 헤더 */}
+                <div className="p-4 border-b border-base-300">
+                  <div className="flex items-center justify-between mb-3">
+                    {currentConversation ? (
+                      <div className="flex items-center space-x-3">
+                        <div className="avatar">
+                          <div
+                            className={`w-10 rounded-full bg-${currentConversation.project.color} text-${currentConversation.project.color}-content flex items-center justify-center`}
+                          >
+                            <span className="text-sm">
                               {currentConversation.participant.avatar}
                             </span>
                           </div>
                         </div>
-                      )}
-
-                      <div
-                        className={`flex-1 ${
-                          message.sender === "me" ? "max-w-xs ml-auto" : ""
-                        }`}
-                      >
-                        <div
-                          className={`flex items-center space-x-2 mb-1 ${
-                            message.sender === "me" ? "justify-end" : ""
-                          }`}
-                        >
-                          {message.sender === "me" && (
-                            <span className="text-xs text-base-content/60">
-                              {formatMessageTime(message.timestamp)}
-                            </span>
-                          )}
-                          <span className="text-sm font-medium">
-                            {message.sender === "me"
-                              ? "나"
-                              : currentConversation.participant.name}
-                          </span>
-                          {message.sender === "other" && (
-                            <span className="text-xs text-base-content/60">
-                              {formatMessageTime(message.timestamp)}
-                            </span>
-                          )}
-                        </div>
-
-                        <div
-                          className={`rounded-lg p-3 max-w-xs ${
-                            message.sender === "me"
-                              ? "bg-primary text-primary-content ml-auto"
-                              : "bg-base-200"
-                          }`}
-                        >
-                          {message.file ? (
-                            <div className="flex items-center space-x-3 p-3 bg-base-100 rounded border">
-                              <div className="text-2xl">
-                                {message.file.type === "pdf" ? "📄" : "🎨"}
-                              </div>
-                              <div className="flex-1">
-                                <p className="font-medium text-base-content">
-                                  {message.file.name}
-                                </p>
-                                <p className="text-sm text-base-content/60">
-                                  {message.file.size}
-                                </p>
-                              </div>
-                              <button className="btn btn-sm btn-primary">
-                                다운로드
-                              </button>
-                            </div>
-                          ) : (
-                            <span
-                              className={
-                                messageSearchTerm &&
-                                message.content
-                                  .toLowerCase()
-                                  .includes(messageSearchTerm.toLowerCase())
-                                  ? "bg-yellow-200 text-base-content px-1 rounded"
-                                  : ""
-                              }
-                            >
-                              {message.content}
-                            </span>
-                          )}
+                        <div>
+                          <p className="font-medium">
+                            {currentConversation.participant.name}
+                          </p>
+                          <p className="text-xs text-base-content/60">
+                            {currentConversation.project.name}
+                          </p>
                         </div>
                       </div>
-
-                      {message.sender === "me" && (
-                        <div className="avatar">
-                          <div className="w-8 rounded-full bg-neutral text-neutral-content flex items-center justify-center">
-                            <span className="text-xs">나</span>
-                          </div>
+                    ) : (
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 rounded-full bg-base-300"></div>
+                        <div>
+                          <p className="font-medium">대화를 선택해주세요</p>
+                          <p className="text-xs text-base-content/60">메시지</p>
                         </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center space-x-2">
+                      {currentConversation && (
+                        <>
+                          <button className="btn btn-ghost btn-sm">
+                            📹 화상통화
+                          </button>
+                          <button className="btn btn-ghost btn-sm">
+                            📋 프로젝트 보기
+                          </button>
+                        </>
                       )}
                     </div>
-                  ))
-                )}
-              </div>
+                  </div>
 
-              {/* 메시지 입력 영역 */}
-              <div className="p-4 border-t border-base-300">
-                <div className="flex space-x-2">
-                  <button className="btn btn-ghost btn-sm">📎</button>
-                  <input
-                    type="text"
-                    placeholder="메시지를 입력하세요..."
-                    className="input input-bordered flex-1"
-                  />
-                  <button className="btn btn-primary">전송</button>
+                  {/* 메시지 검색 */}
+                  {currentConversation && (
+                    <div className="input-group input-group-sm">
+                      <input
+                        type="text"
+                        placeholder="메시지 내용 검색..."
+                        className="input input-bordered input-sm flex-1"
+                        value={messageSearchTerm}
+                        onChange={(e) => setMessageSearchTerm(e.target.value)}
+                      />
+                      {messageSearchTerm && (
+                        <>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => setMessageSearchTerm("")}
+                          >
+                            ✕
+                          </button>
+                          <span className="btn btn-ghost btn-sm pointer-events-none">
+                            {filteredMessages.length}개 결과
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
+
+                {/* 메시지 영역 */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {!currentConversation ? (
+                    <div className="text-center py-12">
+                      <div className="text-6xl mb-4">💬</div>
+                      <h3 className="text-xl font-bold mb-2">
+                        대화를 선택해주세요
+                      </h3>
+                      <p className="text-base-content/60">
+                        왼쪽에서 대화를 선택하면 메시지를 확인할 수 있습니다.
+                      </p>
+                    </div>
+                  ) : filteredMessages.length === 0 && messageSearchTerm ? (
+                    <div className="text-center py-12">
+                      <div className="text-6xl mb-4">🔍</div>
+                      <h3 className="text-xl font-bold mb-2">
+                        검색 결과가 없습니다
+                      </h3>
+                      <p className="text-base-content/60">
+                        "{messageSearchTerm}"에 대한 메시지를 찾을 수 없습니다.
+                      </p>
+                    </div>
+                  ) : (
+                    filteredMessages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={`flex items-start space-x-3 ${
+                          message.sender === "me" ? "justify-end" : ""
+                        }`}
+                      >
+                        {message.sender === "other" && (
+                          <div className="avatar">
+                            <div
+                              className={`w-8 rounded-full bg-${currentConversation.project.color} text-${currentConversation.project.color}-content flex items-center justify-center`}
+                            >
+                              <span className="text-xs">
+                                {currentConversation.participant.avatar}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        <div
+                          className={`flex-1 ${
+                            message.sender === "me" ? "max-w-xs ml-auto" : ""
+                          }`}
+                        >
+                          <div
+                            className={`flex items-center space-x-2 mb-1 ${
+                              message.sender === "me" ? "justify-end" : ""
+                            }`}
+                          >
+                            {message.sender === "me" && (
+                              <span className="text-xs text-base-content/60">
+                                {formatMessageTime(message.timestamp)}
+                              </span>
+                            )}
+                            <span className="text-sm font-medium">
+                              {message.sender === "me"
+                                ? "나"
+                                : currentConversation.participant.name}
+                            </span>
+                            {message.sender === "other" && (
+                              <span className="text-xs text-base-content/60">
+                                {formatMessageTime(message.timestamp)}
+                              </span>
+                            )}
+                          </div>
+
+                          <div
+                            className={`rounded-lg p-3 max-w-xs ${
+                              message.sender === "me"
+                                ? "bg-primary text-primary-content ml-auto"
+                                : "bg-base-200"
+                            }`}
+                          >
+                            {message.file ? (
+                              <div className="flex items-center space-x-3 p-3 bg-base-100 rounded border">
+                                <div className="text-2xl">
+                                  {message.file.type === "pdf" ? "📄" : "🎨"}
+                                </div>
+                                <div className="flex-1">
+                                  <p className="font-medium text-base-content">
+                                    {message.file.name}
+                                  </p>
+                                  <p className="text-sm text-base-content/60">
+                                    {message.file.size}
+                                  </p>
+                                </div>
+                                <button className="btn btn-sm btn-primary">
+                                  다운로드
+                                </button>
+                              </div>
+                            ) : (
+                              <span
+                                className={
+                                  messageSearchTerm &&
+                                  message.content
+                                    .toLowerCase()
+                                    .includes(messageSearchTerm.toLowerCase())
+                                    ? "bg-yellow-200 text-base-content px-1 rounded"
+                                    : ""
+                                }
+                              >
+                                {message.content}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {message.sender === "me" && (
+                          <div className="avatar">
+                            <div className="w-8 rounded-full bg-neutral text-neutral-content flex items-center justify-center">
+                              <span className="text-xs">나</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* 메시지 입력 영역 */}
+                {currentConversation && (
+                  <div className="p-4 border-t border-base-300">
+                    <div className="flex space-x-2">
+                      <button className="btn btn-ghost btn-sm">📎</button>
+                      <input
+                        type="text"
+                        placeholder="메시지를 입력하세요..."
+                        className="input input-bordered flex-1"
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSendMessage();
+                          }
+                        }}
+                      />
+                      <button 
+                        className="btn btn-primary"
+                        onClick={handleSendMessage}
+                        disabled={!newMessage.trim()}
+                      >
+                        전송
+                      </button>
+                    </div>
+                    <div className="text-xs text-base-content/60 mt-2">
+                      Enter로 전송 • Shift+Enter로 줄바꿈
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </DashboardLayout>
+      </DashboardLayout>
+    </AuthWrapper>
   );
 }

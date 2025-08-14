@@ -1,9 +1,13 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Link from "next/link";
-import { Project } from "@/types";
+import { Project, UserRole } from "@/types";
+import { useAuth } from "@/hooks/useAuth";
+import AuthWrapper from "@/components/auth/AuthWrapper";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ProjectCardSkeleton } from "@/components/ui/Skeleton";
 
 // 모의 프로젝트 데이터
 const mockProjects: Project[] = [
@@ -12,14 +16,15 @@ const mockProjects: Project[] = [
     name: "로고 디자인 프로젝트",
     description: "브랜드 아이덴티티를 위한 로고 디자인",
     status: "feedback_period",
-    client_id: "client-1",
-    designer_id: "designer-1",
+    client_id: "1",
+    designer_id: "2",
     start_date: "2024-01-15",
     end_date: "2024-02-15",
     draft_deadline: "2024-01-25",
     first_review_deadline: "2024-02-05",
     final_review_deadline: "2024-02-12",
     estimated_price: 2500000,
+    budget_used: 1850000,
     total_modification_count: 3,
     remaining_modification_count: 1,
     requirements: "모던하고 미니멀한 스타일의 로고",
@@ -33,14 +38,15 @@ const mockProjects: Project[] = [
     name: "웹사이트 UI/UX 디자인",
     description: "반응형 웹사이트 UI/UX 디자인 프로젝트",
     status: "in_progress",
-    client_id: "client-1",
-    designer_id: "designer-2",
+    client_id: "1",
+    designer_id: "2",
     start_date: "2024-01-10",
     end_date: "2024-02-20",
     draft_deadline: "2024-01-30",
     first_review_deadline: "2024-02-10",
     final_review_deadline: "2024-02-18",
     estimated_price: 4000000,
+    budget_used: 1200000,
     total_modification_count: 3,
     remaining_modification_count: 3,
     requirements: "사용자 친화적인 웹사이트 디자인",
@@ -52,14 +58,15 @@ const mockProjects: Project[] = [
     name: "브랜딩 패키지 디자인",
     description: "로고, 명함, 브로셔 등 통합 브랜딩 패키지",
     status: "completed",
-    client_id: "client-1",
-    designer_id: "designer-3",
+    client_id: "1",
+    designer_id: "2",
     start_date: "2023-12-01",
     end_date: "2024-01-15",
     draft_deadline: "2023-12-15",
     first_review_deadline: "2024-01-05",
     final_review_deadline: "2024-01-12",
     estimated_price: 3500000,
+    budget_used: 3500000,
     total_modification_count: 3,
     remaining_modification_count: 1,
     requirements: "통일된 브랜드 아이덴티티",
@@ -72,14 +79,15 @@ const mockProjects: Project[] = [
     name: "모바일 앱 UI 디자인",
     description: "iOS/Android 모바일 앱 UI 디자인",
     status: "archived",
-    client_id: "client-1",
-    designer_id: "designer-1",
+    client_id: "1",
+    designer_id: "2",
     start_date: "2023-11-01",
     end_date: "2023-12-31",
     draft_deadline: "2023-11-20",
     first_review_deadline: "2023-12-10",
     final_review_deadline: "2023-12-28",
     estimated_price: 5000000,
+    budget_used: 5000000,
     total_modification_count: 3,
     remaining_modification_count: 0,
     requirements: "직관적이고 세련된 모바일 앱 UI",
@@ -88,16 +96,61 @@ const mockProjects: Project[] = [
     created_at: "2023-11-01T09:00:00Z",
     updated_at: "2024-01-10T10:00:00Z",
   },
+  {
+    id: "5",
+    name: "새 브랜드 런칭 디자인",
+    description: "로고/가이드/패키지 일괄 디자인",
+    status: "creation_pending",
+    client_id: "1",
+    designer_id: "2",
+    start_date: "2024-02-01",
+    end_date: "2024-03-01",
+    draft_deadline: "2024-02-10",
+    first_review_deadline: "2024-02-18",
+    final_review_deadline: "2024-02-25",
+    estimated_price: 4800000,
+    budget_used: 0,
+    total_modification_count: 3,
+    remaining_modification_count: 3,
+    requirements: "신규 런칭 브랜드 전체 패키지",
+    created_at: "2024-01-22T09:00:00Z",
+    updated_at: "2024-01-22T09:00:00Z",
+  },
+  {
+    id: "6",
+    name: "이벤트 포스터 디자인",
+    description: "온라인/오프라인 이벤트 포스터 시리즈",
+    status: "review_requested",
+    client_id: "1",
+    designer_id: "2",
+    start_date: "2024-01-20",
+    end_date: "2024-02-05",
+    draft_deadline: "2024-01-25",
+    first_review_deadline: "2024-01-30",
+    final_review_deadline: "2024-02-03",
+    estimated_price: 1200000,
+    budget_used: 600000,
+    total_modification_count: 2,
+    remaining_modification_count: 2,
+    requirements: "밝고 주목성 높은 톤",
+    created_at: "2024-01-20T09:00:00Z",
+    updated_at: "2024-01-21T10:00:00Z",
+  },
 ];
 
 const designerNames: Record<string, string> = {
-  "designer-1": "김디자이너",
-  "designer-2": "이디자이너",
-  "designer-3": "박디자이너",
+  "1": "김디자이너",
+  "2": "이디자이너",
+  "3": "박디자이너",
 };
 
 export default function ProjectsPage() {
-  const userRole = "client" as const;
+  const { user } = useAuth();
+  const userRole: UserRole = user?.role ?? user?.userType ?? "client";
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const initializedRef = useRef(false);
+  const [loading, setLoading] = useState(true);
 
   // 검색 및 필터 상태
   const [searchTerm, setSearchTerm] = useState("");
@@ -105,6 +158,45 @@ export default function ProjectsPage() {
   const [designerFilter, setDesignerFilter] = useState("all");
   const [sortBy, setSortBy] = useState("updated_desc");
   const [showArchived, setShowArchived] = useState(false);
+
+  // 1) 쿼리스트링 → 상태 초기화 (최초 1회)
+  useEffect(() => {
+    if (initializedRef.current) return;
+    const q = searchParams.get("q");
+    const status = searchParams.get("status");
+    const designer = searchParams.get("designer");
+    const sort = searchParams.get("sort");
+    const archived = searchParams.get("archived");
+
+    if (q) setSearchTerm(q);
+    if (status) setStatusFilter(status);
+    if (designer) setDesignerFilter(designer);
+    if (sort) setSortBy(sort);
+    if (archived === "1") setShowArchived(true);
+
+    initializedRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 초기 로딩 스켈레톤 표시 (mock 환경)
+  useEffect(() => {
+    const t = setTimeout(() => setLoading(false), 400);
+    return () => clearTimeout(t);
+  }, []);
+
+  // 2) 상태 → 쿼리스트링 동기화
+  useEffect(() => {
+    if (!initializedRef.current) return;
+    const next = new URLSearchParams();
+    if (searchTerm) next.set("q", searchTerm);
+    if (statusFilter !== "all") next.set("status", statusFilter);
+    if (designerFilter !== "all") next.set("designer", designerFilter);
+    if (sortBy !== "updated_desc") next.set("sort", sortBy);
+    if (showArchived) next.set("archived", "1");
+
+    const query = next.toString();
+    router.replace(query ? `/projects?${query}` : "/projects");
+  }, [searchTerm, statusFilter, designerFilter, sortBy, showArchived, router]);
 
   // 필터링 및 정렬된 프로젝트 목록
   const filteredProjects = useMemo(() => {
@@ -173,6 +265,8 @@ export default function ProjectsPage() {
 
   const getStatusText = (status: string) => {
     const statusMap: Record<string, string> = {
+      creation_pending: "생성 대기중",
+      review_requested: "검토 요청 중",
       client_review_pending: "클라이언트 검토 대기",
       designer_review_pending: "디자이너 검토 대기",
       in_progress: "진행 중",
@@ -188,6 +282,8 @@ export default function ProjectsPage() {
 
   const getStatusBadgeClass = (status: string) => {
     const statusMap: Record<string, string> = {
+      creation_pending: "badge-neutral",
+      review_requested: "badge-warning",
       client_review_pending: "badge-warning",
       designer_review_pending: "badge-info",
       in_progress: "badge-primary",
@@ -203,6 +299,10 @@ export default function ProjectsPage() {
 
   const calculateProgress = (project: Project) => {
     switch (project.status) {
+      case "creation_pending":
+        return 0;
+      case "review_requested":
+        return 10;
       case "client_review_pending":
       case "designer_review_pending":
         return 10;
@@ -235,10 +335,71 @@ export default function ProjectsPage() {
     setStatusFilter("all");
     setDesignerFilter("all");
     setSortBy("updated_desc");
+    setShowArchived(false);
   };
 
-  return (
-    <DashboardLayout title="내 프로젝트" userRole={userRole}>
+  const renderLoading = () => (
+    <>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <div className="skeleton h-6 w-40 mb-2" />
+          <div className="skeleton h-4 w-64" />
+        </div>
+        <div className="skeleton h-10 w-32" />
+      </div>
+
+      {/* 탭 스켈레톤 */}
+      <div className="flex space-x-2 mb-6">
+        <div className="skeleton h-10 w-32 rounded-lg" />
+        <div className="skeleton h-10 w-28 rounded-lg" />
+      </div>
+
+      {/* 아카이브 토글 스켈레톤 */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex space-x-2">
+          <div className="skeleton h-10 w-40 rounded-lg" />
+          <div className="skeleton h-10 w-32 rounded-lg" />
+        </div>
+      </div>
+
+      {/* 필터 카드 스켈레톤 */}
+      <div className="card bg-base-100 shadow-sm mb-6">
+        <div className="card-body">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="lg:col-span-4">
+              <div className="skeleton h-4 w-16 mb-2" />
+              <div className="skeleton h-10 w-full" />
+            </div>
+            <div className="lg:col-span-3">
+              <div className="skeleton h-4 w-12 mb-2" />
+              <div className="skeleton h-10 w-full" />
+            </div>
+            <div className="lg:col-span-3">
+              <div className="skeleton h-4 w-20 mb-2" />
+              <div className="skeleton h-10 w-full" />
+            </div>
+            <div className="lg:col-span-2">
+              <div className="skeleton h-4 w-12 mb-2" />
+              <div className="skeleton h-10 w-full" />
+            </div>
+          </div>
+          <div className="mt-4 pt-4 border-t">
+            <div className="skeleton h-3 w-64" />
+          </div>
+        </div>
+      </div>
+
+      {/* 프로젝트 카드 스켈레톤 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <ProjectCardSkeleton key={i} />
+        ))}
+      </div>
+    </>
+  );
+
+  const renderContent = () => (
+    <div>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">프로젝트 관리</h1>
@@ -248,6 +409,16 @@ export default function ProjectsPage() {
         </div>
         <Link href="/projects/create" className="btn btn-primary">
           새 프로젝트 생성
+        </Link>
+      </div>
+
+      {/* 상단 서브 탭: 내 프로젝트 / 계약 관리 */}
+      <div className="tabs tabs-boxed mb-6">
+        <Link href="/projects" className={`tab tab-lg tab-active`}>
+          📁 내 프로젝트
+        </Link>
+        <Link href="/contracts" className="tab tab-lg">
+          📋 계약 관리
         </Link>
       </div>
 
@@ -319,6 +490,8 @@ export default function ProjectsPage() {
                   onChange={(e) => setStatusFilter(e.target.value)}
                 >
                   <option value="all">모든 상태</option>
+                  <option value="creation_pending">생성 대기중</option>
+                  <option value="review_requested">검토 요청 중</option>
                   <option value="in_progress">진행 중</option>
                   <option value="feedback_period">피드백 정리 기간</option>
                   <option value="modification_in_progress">수정 작업 중</option>
@@ -340,9 +513,9 @@ export default function ProjectsPage() {
                   onChange={(e) => setDesignerFilter(e.target.value)}
                 >
                   <option value="all">모든 디자이너</option>
-                  <option value="designer-1">김디자이너</option>
-                  <option value="designer-2">이디자이너</option>
-                  <option value="designer-3">박디자이너</option>
+                  <option value="1">김디자이너</option>
+                  <option value="2">이디자이너</option>
+                  <option value="3">박디자이너</option>
                 </select>
               </div>
             </div>
@@ -425,8 +598,20 @@ export default function ProjectsPage() {
             return (
               <div
                 key={project.id}
-                className="card bg-base-100 shadow-sm hover:shadow-md transition-shadow"
+                className="card bg-base-100 shadow-sm hover:shadow-md transition-shadow relative"
               >
+                {(project.status === "creation_pending" ||
+                  project.status === "review_requested") && (
+                  <div
+                    className={`absolute -top-2 -left-2 px-3 py-1 rounded-md text-xs font-semibold shadow ${
+                      project.status === "creation_pending"
+                        ? "bg-base-200 text-base-content"
+                        : "bg-warning text-warning-content"
+                    }`}
+                  >
+                    {getStatusText(project.status)}
+                  </div>
+                )}
                 <div className="card-body">
                   <div className="flex items-start justify-between mb-4">
                     <div>
@@ -454,6 +639,26 @@ export default function ProjectsPage() {
                       <p className="text-sm font-medium">{designerName}</p>
                       <p className="text-xs text-base-content/60">
                         {project.estimated_price.toLocaleString()}원
+                      </p>
+                    </div>
+                    <div className="ml-auto text-right">
+                      <p className="text-xs text-base-content/60">
+                        예산 사용률
+                      </p>
+                      <p
+                        className={`text-xs font-medium ${
+                          project.budget_used / project.estimated_price > 0.9
+                            ? "text-warning"
+                            : project.budget_used / project.estimated_price >
+                              0.8
+                            ? "text-info"
+                            : "text-success"
+                        }`}
+                      >
+                        {Math.round(
+                          (project.budget_used / project.estimated_price) * 100
+                        )}
+                        %
                       </p>
                     </div>
                   </div>
@@ -532,28 +737,46 @@ export default function ProjectsPage() {
 
                   <div className="card-actions justify-end">
                     <Link
-                      href={`/projects/${project.id}`}
+                      href={`/projects/${project.id}${
+                        project.status === "feedback_period"
+                          ? "?tab=reports"
+                          : ""
+                      }`}
                       className="btn btn-sm btn-outline"
                     >
                       상세보기
                     </Link>
                     {project.status === "feedback_period" && (
-                      <button className="btn btn-sm btn-warning">
+                      <Link
+                        href={`/projects/${project.id}?tab=reports`}
+                        className="btn btn-sm btn-warning"
+                      >
                         피드백 작성
-                      </button>
+                      </Link>
                     )}
                     {project.status === "in_progress" && (
-                      <button className="btn btn-sm btn-primary">메시지</button>
+                      <Link
+                        href={`/messages`}
+                        className="btn btn-sm btn-primary"
+                      >
+                        메시지
+                      </Link>
                     )}
                     {project.status === "completed" && (
-                      <button className="btn btn-sm btn-primary">
+                      <Link
+                        href={`/projects/${project.id}?action=review`}
+                        className="btn btn-sm btn-primary"
+                      >
                         리뷰 작성
-                      </button>
+                      </Link>
                     )}
                     {project.status === "completion_requested" && (
-                      <button className="btn btn-sm btn-success">
+                      <Link
+                        href={`/projects/${project.id}?action=deliverables`}
+                        className="btn btn-sm btn-success"
+                      >
                         승인 대기
-                      </button>
+                      </Link>
                     )}
                   </div>
                 </div>
@@ -582,6 +805,14 @@ export default function ProjectsPage() {
           )}
         </div>
       )}
-    </DashboardLayout>
+    </div>
+  );
+
+  return (
+    <AuthWrapper requireAuth>
+      <DashboardLayout title="내 프로젝트" userRole={userRole}>
+        {loading ? renderLoading() : renderContent()}
+      </DashboardLayout>
+    </AuthWrapper>
   );
 }

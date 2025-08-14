@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import NotificationsDropdown from "@/components/ui/NotificationsDropdown";
+import GlobalSearch from "@/components/search/GlobalSearch";
 
 interface HeaderProps {
   title: string;
@@ -33,12 +35,12 @@ const Header = ({ title, onMenuClick }: HeaderProps) => {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-30 bg-base-100 border-b border-base-300 lg:left-64">
-      <div className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center space-x-4">
+      <div className="flex items-center justify-between px-4 py-3 gap-4">
+        <div className="flex items-center space-x-4 min-w-0">
           {/* 모바일 메뉴 버튼 */}
           <button
             onClick={onMenuClick}
-            className="btn btn-ghost btn-sm lg:hidden"
+            className="btn btn-ghost btn-sm lg:hidden flex-shrink-0"
           >
             <svg
               className="w-6 h-6"
@@ -55,43 +57,44 @@ const Header = ({ title, onMenuClick }: HeaderProps) => {
             </svg>
           </button>
 
-          {/* 페이지 제목 */}
-          <h1 className="text-xl font-semibold text-base-content">{title}</h1>
+          {/* 페이지 제목 - 모바일에서는 숨김 */}
+          <h1 className="hidden sm:block text-lg sm:text-xl font-semibold text-base-content truncate">{title}</h1>
+        </div>
+
+        {/* 전역 검색 - 데스크탑 */}
+        <div className="hidden lg:block flex-1 max-w-md mx-4">
+          <GlobalSearch />
         </div>
 
         {/* 헤더 액션들 */}
-        <div className="flex items-center space-x-2">
-          {/* 알림 버튼 */}
-          <button className="btn btn-ghost btn-sm">
-            <div className="indicator">
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 17h5l-5 5v-5z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 17H4l5 5v-5z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 3v3m0 12v3m9-9h-3M3 12h3m15.364-6.364l-2.121 2.121M6.757 17.243l-2.121 2.121m12.728 0l-2.121-2.121M6.757 6.757L4.636 4.636"
-                />
-              </svg>
-              <span className="badge badge-xs badge-primary indicator-item"></span>
-            </div>
+        <div className="flex items-center space-x-1 sm:space-x-2">
+          {/* 모바일 검색 버튼 */}
+          <button
+            className="btn btn-ghost btn-sm lg:hidden"
+            onClick={() => {
+              // 모바일 검색 모달 열기
+              const searchModal = document.getElementById('mobile-search-modal') as HTMLDialogElement;
+              searchModal?.showModal();
+            }}
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
           </button>
+
+          {/* 알림 드롭다운 */}
+          <NotificationsDropdown userId={user?.id} />
+          {/** 미확인 개수 뱃지를 아이콘에 수치로 표시하도록 개선하려면 NotificationsDropdown 내부에서 처리됨 */}
 
           {/* 사용자 드롭다운 */}
           <div className="dropdown dropdown-end" data-tour="profile">
@@ -104,7 +107,7 @@ const Header = ({ title, onMenuClick }: HeaderProps) => {
                 <div className="avatar placeholder">
                   <div
                     className={`${
-                      user?.userType === "client"
+                      (user?.role ?? user?.userType) === "client"
                         ? "bg-primary text-primary-content"
                         : "bg-secondary text-secondary-content"
                     } rounded-full w-8`}
@@ -116,12 +119,14 @@ const Header = ({ title, onMenuClick }: HeaderProps) => {
             </div>
             <ul
               tabIndex={0}
-              className="mt-3 z-[1] p-2 shadow menu menu-sm dropdown-content bg-base-100 rounded-box w-52"
+              className="mt-3 z-[1] p-2 shadow menu menu-sm dropdown-content bg-base-100 rounded-box w-48 sm:w-52"
             >
               <li className="menu-title">
                 <span>{user?.name || user?.email}</span>
                 <span className="text-xs opacity-60">
-                  {user?.userType === "client" ? "클라이언트" : "디자이너"}
+                  {(user?.role ?? user?.userType) === "client"
+                    ? "클라이언트"
+                    : "디자이너"}
                 </span>
               </li>
               <li>
@@ -191,6 +196,25 @@ const Header = ({ title, onMenuClick }: HeaderProps) => {
           </div>
         </div>
       </div>
+
+      {/* 모바일 검색 모달 */}
+      <dialog id="mobile-search-modal" className="modal lg:hidden">
+        <div className="modal-box w-full max-w-lg">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold text-lg">검색</h3>
+            <form method="dialog">
+              <button className="btn btn-ghost btn-sm">✕</button>
+            </form>
+          </div>
+          <GlobalSearch 
+            placeholder="프로젝트, 메시지, 파일 검색..." 
+            showShortcut={false}
+          />
+        </div>
+        <form method="dialog" className="modal-backdrop">
+          <button>close</button>
+        </form>
+      </dialog>
     </header>
   );
 };

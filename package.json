@@ -12,10 +12,20 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.52.0",
+    "@tiptap/extension-character-count": "^3.2.0",
+    "@tiptap/extension-highlight": "^3.1.0",
+    "@tiptap/extension-image": "^3.1.0",
+    "@tiptap/extension-link": "^3.1.0",
+    "@tiptap/extension-placeholder": "^3.2.0",
+    "@tiptap/extension-table": "^3.1.0",
+    "@tiptap/extension-text-align": "^3.1.0",
+    "@tiptap/react": "^3.1.0",
+    "@tiptap/starter-kit": "^3.1.0",
     "daisyui": "^5.0.46",
     "next": "15.4.2",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "recharts": "^3.1.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

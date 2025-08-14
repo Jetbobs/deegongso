@@ -8,6 +8,8 @@ interface User {
   email: string;
   name: string;
   userType: "client" | "designer";
+  // 타입 일관화를 위해 role을 함께 노출 (userType과 동일 값)
+  role?: "client" | "designer";
   phone?: string;
   company?: string;
   experience?: string;
@@ -21,6 +23,7 @@ const MOCK_USERS: User[] = [
     email: "client@gmail.com",
     name: "김클라이언트",
     userType: "client",
+    role: "client",
     phone: "010-1234-5678",
     company: "스타트업 ABC",
   },
@@ -29,6 +32,7 @@ const MOCK_USERS: User[] = [
     email: "designer@gmail.com",
     name: "박디자이너",
     userType: "designer",
+    role: "designer",
     phone: "010-9876-5432",
     experience: "3-5년",
   },
@@ -51,7 +55,15 @@ export function useAuth() {
       const savedUser = localStorage.getItem("deeo_user");
       if (savedUser) {
         try {
-          setUser(JSON.parse(savedUser));
+          const parsed = JSON.parse(savedUser);
+          // role 필드가 없으면 userType을 기준으로 보강 후 저장
+          const hydrated: User = {
+            ...parsed,
+            id: String(parsed.id),
+            role: parsed.role ?? parsed.userType,
+          };
+          setUser(hydrated);
+          localStorage.setItem("deeo_user", JSON.stringify(hydrated));
         } catch (error) {
           console.error("사용자 정보 복원 실패:", error);
           localStorage.removeItem("deeo_user");
@@ -78,8 +90,17 @@ export function useAuth() {
       }
     } else {
       // 새 사용자 - 추가 정보 입력 필요
+      // 테스트를 위해 특정 이메일에 고정 ID 할당
+      let userId = "1"; // 기본값: 클라이언트 ID
+      if (email.includes("designer") || email.includes("디자이너")) {
+        userId = "2"; // 디자이너 ID
+      } else if (email.includes("client") || email.includes("클라이언트")) {
+        userId = "1"; // 클라이언트 ID (명시적)
+      }
+      // 기타 모든 이메일은 기본적으로 클라이언트(ID: "1")로 처리
+
       const newUser: Partial<User> = {
-        id: Date.now().toString(),
+        id: userId,
         email,
         name: email.split("@")[0],
       };
@@ -97,10 +118,30 @@ export function useAuth() {
 
     await new Promise((resolve) => setTimeout(resolve, 500));
 
+    // 테스트를 위해 특정 이메일에 고정 ID 할당
+    let userId = "1"; // 기본값: 클라이언트 ID
+    if (
+      userData.email.includes("designer") ||
+      userData.email.includes("디자이너")
+    ) {
+      userId = "2"; // 디자이너 ID
+    } else if (
+      userData.email.includes("client") ||
+      userData.email.includes("클라이언트")
+    ) {
+      userId = "1"; // 클라이언트 ID (명시적)
+    }
+    // 기타 모든 이메일은 기본적으로 클라이언트(ID: "1")로 처리
+
+    const roleFromType: "client" | "designer" =
+      (userData as any).userType === "designer" ? "designer" : "client";
+
     const newUser: User = {
       ...userData,
-      id: Date.now().toString(),
-    };
+      id: userId,
+      userType: (userData as any).userType ?? roleFromType,
+      role: roleFromType,
+    } as User;
 
     setUser(newUser);
     if (typeof window !== "undefined") {
