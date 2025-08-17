@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Image from "next/image";
 import { Feedback, FeedbackAttachment } from "@/types";
 import RichTextEditor from "@/components/ui/RichTextEditor";
 import { useAuth } from "@/hooks/useAuth";
@@ -271,9 +272,11 @@ export default function FeedbackForm({
                 >
                   <div className="flex items-center space-x-3">
                     {attachment.thumbnail_url ? (
-                      <img
+                      <Image
                         src={attachment.thumbnail_url}
                         alt={attachment.file_name}
+                        width={48}
+                        height={48}
                         className="w-12 h-12 object-cover rounded"
                       />
                     ) : (

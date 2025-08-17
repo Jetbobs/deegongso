@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import AuthWrapper from "@/components/auth/AuthWrapper";
@@ -74,7 +75,7 @@ export default function SettingsPage() {
     useState<SettingsSection>("profile");
 
   // 사용자 역할에 따라 적절한 기본 프로필 선택
-  const getInitialProfile = (): UserProfile => {
+  const getInitialProfile = useCallback((): UserProfile => {
     const baseProfile =
       userRole === "designer" ? defaultDesignerProfile : defaultClientProfile;
     // useAuth의 사용자 정보가 있으면 병합
@@ -87,7 +88,7 @@ export default function SettingsPage() {
       };
     }
     return baseProfile;
-  };
+  }, [user, userRole]);
 
   const [userProfile, setUserProfile] = useState<UserProfile>(
     getInitialProfile()
@@ -98,7 +99,7 @@ export default function SettingsPage() {
   // 사용자 정보가 변경될 때 프로필 업데이트
   useEffect(() => {
     setUserProfile(getInitialProfile());
-  }, [user, userRole]);
+  }, [getInitialProfile]);
 
   // NOTE: 좌측 메뉴 및 일부 섹션 표시는 useAuth의 역할을 우선 적용
   const effectiveRole: UserRole = userRole;
@@ -231,7 +232,7 @@ function ProfileSection({
   onSave: () => void;
   onCancel: () => void;
 }) {
-  const updateProfile = (field: keyof UserProfile, value: any) => {
+  const updateProfile = (field: keyof UserProfile, value: UserProfile[keyof UserProfile]) => {
     setUserProfile({ ...userProfile, [field]: value });
     setHasChanges(true);
   };
@@ -285,7 +286,7 @@ function ProfileSection({
             <div className="avatar">
               <div className="w-20 h-20 rounded-full bg-primary text-primary-content flex items-center justify-center text-2xl">
                 {userProfile.avatar ? (
-                  <img src={userProfile.avatar} alt="프로필" />
+                  <Image src={userProfile.avatar} alt="프로필" width={80} height={80} className="rounded-full" />
                 ) : (
                   userProfile.name.charAt(0)
                 )}
@@ -423,7 +424,7 @@ function DesignerAdditionalInfo({
   isEditing,
 }: {
   userProfile: UserProfile;
-  updateProfile: (field: keyof UserProfile, value: any) => void;
+  updateProfile: (field: keyof UserProfile, value: UserProfile[keyof UserProfile]) => void;
   isEditing: boolean;
 }) {
   const specialtyOptions = [
@@ -612,7 +613,7 @@ function ClientAdditionalInfo({
   isEditing,
 }: {
   userProfile: UserProfile;
-  updateProfile: (field: keyof UserProfile, value: any) => void;
+  updateProfile: (field: keyof UserProfile, value: UserProfile[keyof UserProfile]) => void;
   isEditing: boolean;
 }) {
   return (
@@ -773,7 +774,7 @@ function NotificationsSection() {
 
   const updateNotification = (
     key: keyof NotificationSettingsType,
-    value: any
+    value: NotificationSettingsType[keyof NotificationSettingsType]
   ) => {
     const updated = { ...notifications, [key]: value };
     setNotifications(updated);

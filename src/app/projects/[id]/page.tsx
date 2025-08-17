@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { useAuth } from "@/hooks/useAuth";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import AuthWrapper from "@/components/auth/AuthWrapper";
@@ -11,7 +12,6 @@ import { FeedbackVersionManager } from "@/lib/feedbackVersionManager";
 import FeedbackForm from "@/components/feedback/FeedbackForm";
 import FeedbackList from "@/components/feedback/FeedbackList";
 import FeedbackVersionHistory from "@/components/feedback/FeedbackVersionHistory";
-import ImageAnnotation from "@/components/feedback/ImageAnnotation";
 import FileUpload, { UploadedFile } from "@/components/ui/FileUpload";
 import { addNotification } from "@/lib/notifications";
 
@@ -99,7 +99,6 @@ export default function EnhancedProjectDetailPage() {
   // 갤러리 뷰 상태
   const [showAllDrafts, setShowAllDrafts] = useState(false);
   const [showAllIntermediate, setShowAllIntermediate] = useState(false);
-  const [showAllFinal, setShowAllFinal] = useState(false);
   
   // 모달 상태
   const [selectedImage, setSelectedImage] = useState<{
@@ -380,7 +379,7 @@ export default function EnhancedProjectDetailPage() {
   };
 
   // 파일 다운로드 (모의 구현)
-  const handleFileDownload = (file: UploadedFile | any) => {
+  const handleFileDownload = (file: UploadedFile | { name: string; [key: string]: unknown }) => {
     // 실제 구현에서는 서버에서 파일을 다운로드
     console.log('파일 다운로드:', file.name);
     addNotification({
@@ -391,7 +390,7 @@ export default function EnhancedProjectDetailPage() {
   };
 
   // 파일 공유 링크 생성 (모의 구현)
-  const handleFileShare = (file: UploadedFile | any) => {
+  const handleFileShare = (file: UploadedFile | { id: string; name: string; [key: string]: unknown }) => {
     const shareLink = `${window.location.origin}/projects/${projectId}/files/${file.id}`;
     navigator.clipboard.writeText(shareLink);
     addNotification({
@@ -496,7 +495,7 @@ export default function EnhancedProjectDetailPage() {
           url: `/projects/${projectId}?tab=files`,
         });
       }, 2000);
-    } catch (error) {
+    } catch {
       setUploadingStage(null);
       alert('업로드 중 오류가 발생했습니다. 다시 시도해주세요.');
     }
@@ -752,9 +751,11 @@ export default function EnhancedProjectDetailPage() {
                       {(showAllDrafts ? mockDraftFiles : mockDraftFiles.slice(0, 4)).map((file, index) => (
                         <div key={file.id} className="bg-base-100 p-3 rounded-lg hover:shadow-md transition-shadow">
                           <div className="relative">
-                            <img 
+                            <Image 
                               src={file.preview} 
                               alt={file.name}
+                              width={200}
+                              height={showAllDrafts ? 96 : 128}
                               className={`w-full ${showAllDrafts ? 'h-24' : 'h-32'} object-cover rounded cursor-pointer`}
                               onClick={() => setSelectedImage({
                                 src: file.preview,
@@ -938,13 +939,15 @@ export default function EnhancedProjectDetailPage() {
                     </div>
                     
                     <div className={`grid ${showAllIntermediate ? 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6' : 'grid-cols-3 md:grid-cols-6'} gap-3`}>
-                      {(showAllIntermediate ? mockIntermediateFiles : mockIntermediateFiles.slice(0, 6)).map((file, index) => (
+                      {(showAllIntermediate ? mockIntermediateFiles : mockIntermediateFiles.slice(0, 6)).map((file) => (
                         <div key={file.id} className="bg-base-100 p-2 rounded-lg hover:shadow-md transition-shadow">
                           <div className="relative">
                             {file.preview ? (
-                              <img 
+                              <Image 
                                 src={file.preview} 
                                 alt={file.name}
+                                width={150}
+                                height={showAllIntermediate ? 80 : 96}
                                 className={`w-full ${showAllIntermediate ? 'h-20' : 'h-24'} object-cover rounded cursor-pointer`}
                                 onClick={() => setSelectedImage({
                                   src: file.preview || '',
@@ -1247,9 +1250,11 @@ export default function EnhancedProjectDetailPage() {
                 
                 {/* 간단한 이미지 표시 (스피너 없이) */}
                 <div className="relative">
-                  <img 
+                  <Image 
                     src="https://picsum.photos/800/600?random=2" 
                     alt="로고 초안 V2"
+                    width={800}
+                    height={600}
                     className="w-full max-w-2xl h-auto rounded-lg border border-base-300"
                   />
                   
@@ -1355,7 +1360,7 @@ export default function EnhancedProjectDetailPage() {
                             <td>
                               <div className="flex items-center space-x-3">
                                 {file.preview ? (
-                                  <img src={file.preview} alt={file.name} className="w-8 h-8 object-cover rounded" />
+                                  <Image src={file.preview} alt={file.name} width={32} height={32} className="w-8 h-8 object-cover rounded" />
                                 ) : (
                                   <div className="w-8 h-8 bg-base-300 rounded flex items-center justify-center text-sm">
                                     {file.type === 'application/pdf' ? '📄' : file.type.includes('zip') ? '📦' : '📁'}
@@ -1552,9 +1557,11 @@ export default function EnhancedProjectDetailPage() {
               </div>
               
               <div className="flex flex-col items-center">
-                <img 
+                <Image 
                   src={selectedImage.src} 
                   alt={selectedImage.alt}
+                  width={600}
+                  height={400}
                   className="max-w-full max-h-96 object-contain rounded-lg shadow-lg"
                 />
                 

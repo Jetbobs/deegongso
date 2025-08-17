@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -117,6 +117,13 @@ export default function GlobalSearch({
     return () => clearTimeout(debounce);
   }, [query]);
 
+  const handleResultSelect = useCallback((result: SearchResult) => {
+    router.push(result.url);
+    setIsOpen(false);
+    setQuery("");
+    setResults([]);
+  }, [router]);
+
   // 키보드 단축키 처리
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -153,7 +160,7 @@ export default function GlobalSearch({
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, results, selectedIndex]);
+  }, [isOpen, results, selectedIndex, handleResultSelect]);
 
   // 외부 클릭 시 닫기
   useEffect(() => {
@@ -170,12 +177,6 @@ export default function GlobalSearch({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleResultSelect = (result: SearchResult) => {
-    router.push(result.url);
-    setIsOpen(false);
-    setQuery("");
-    setResults([]);
-  };
 
   const getResultIcon = (type: SearchResult["type"]) => {
     switch (type) {
@@ -247,7 +248,7 @@ export default function GlobalSearch({
             query.trim() ? (
               <div className="p-4 text-center text-base-content/60">
                 <div className="text-4xl mb-2">🔍</div>
-                <p>'{query}'에 대한 검색 결과가 없습니다</p>
+                <p>&apos;{query}&apos;에 대한 검색 결과가 없습니다</p>
               </div>
             ) : (
               <div className="p-4 text-center text-base-content/60">

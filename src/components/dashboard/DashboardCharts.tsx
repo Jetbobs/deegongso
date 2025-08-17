@@ -1,9 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import {
-  LineChart,
-  Line,
   AreaChart,
   Area,
   BarChart,
@@ -16,9 +14,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer,
-  RadialBarChart,
-  RadialBar
+  ResponsiveContainer
 } from "recharts";
 
 // Mock 데이터
@@ -29,13 +25,6 @@ const projectProgressData = [
   { date: "2024-01-15", active: 3, completed: 4, total: 7 },
   { date: "2024-01-20", active: 5, completed: 4, total: 9 },
   { date: "2024-01-25", active: 4, completed: 6, total: 10 }
-];
-
-const budgetData = [
-  { name: "로고 디자인", used: 80, remaining: 20, total: 100 },
-  { name: "웹사이트 UI", used: 45, remaining: 55, total: 100 },
-  { name: "브랜딩 패키지", used: 100, remaining: 0, total: 100 },
-  { name: "캠페인 KV", used: 15, remaining: 85, total: 100 }
 ];
 
 const statusDistribution = [
@@ -52,15 +41,6 @@ const performanceMetrics = [
   { metric: "재작업률", value: 15, target: 10, color: "#ef4444", inverse: true }
 ];
 
-const monthlyRevenue = [
-  { month: "10월", revenue: 4200000, projects: 3 },
-  { month: "11월", revenue: 6800000, projects: 4 },
-  { month: "12월", revenue: 3200000, projects: 2 },
-  { month: "1월", revenue: 7500000, projects: 5 },
-  { month: "2월", revenue: 5100000, projects: 3 },
-  { month: "3월", revenue: 8200000, projects: 6 }
-];
-
 const newProjectsData = [
   { month: "10월", newProjects: 3, clients: 2 },
   { month: "11월", newProjects: 5, clients: 3 },
@@ -74,18 +54,28 @@ interface DashboardChartsProps {
   userRole?: "client" | "designer";
 }
 
-export default function DashboardCharts({ userRole = "client" }: DashboardChartsProps) {
+export default function DashboardCharts({}: DashboardChartsProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<"week" | "month" | "quarter">("month");
 
   // 커스텀 툴팁
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  interface TooltipProps {
+    active?: boolean;
+    payload?: Array<{
+      color: string;
+      name: string;
+      value: number;
+    }>;
+    label?: string;
+  }
+  
+  const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-base-100 border border-base-300 rounded-lg shadow-lg p-3">
           <p className="font-medium">{label}</p>
-          {payload.map((entry: any, index: number) => (
+          {payload.map((entry, index: number) => (
             <p key={index} style={{ color: entry.color }} className="text-sm">
-              {`${entry.dataKey}: ${entry.value}${entry.unit || ''}`}
+              {`${entry.name}: ${entry.value}`}
             </p>
           ))}
         </div>
@@ -275,9 +265,6 @@ export default function DashboardCharts({ userRole = "client" }: DashboardCharts
             {/* Progress Bars로 성과지표 표시 */}
             <div className="space-y-6">
               {performanceMetrics.map((metric, index) => {
-                const percentage = metric.inverse 
-                  ? Math.max(0, metric.target - metric.value) / metric.target * 100
-                  : (metric.value / metric.target) * 100;
                 const isGood = metric.inverse 
                   ? metric.value <= metric.target
                   : metric.value >= metric.target;

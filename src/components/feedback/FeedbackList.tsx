@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Image from "next/image";
 import { Feedback, FeedbackAttachment } from "@/types";
 import { useAuth } from "@/hooks/useAuth";
-import RichTextEditor from "@/components/ui/RichTextEditor";
 
 interface FeedbackListProps {
   feedbacks: Feedback[];
@@ -133,9 +133,11 @@ export default function FeedbackList({
   const renderAttachment = (attachment: FeedbackAttachment) => (
     <div key={attachment.id} className="flex items-center space-x-2 p-2 bg-base-200 rounded">
       {attachment.thumbnail_url ? (
-        <img
+        <Image
           src={attachment.thumbnail_url}
           alt={attachment.file_name}
+          width={32}
+          height={32}
           className="w-8 h-8 object-cover rounded cursor-pointer hover:scale-105 transition-transform"
           onClick={() => window.open(attachment.file_url, '_blank')}
         />
@@ -372,7 +374,7 @@ export default function FeedbackList({
               <select
                 className="select select-bordered select-sm"
                 value={filter.status}
-                onChange={(e) => setFilter(prev => ({ ...prev, status: e.target.value as any }))}
+                onChange={(e) => setFilter(prev => ({ ...prev, status: e.target.value as "all" | "pending" | "acknowledged" | "in_progress" | "resolved" | "rejected" }))}
               >
                 <option value="all">모든 상태</option>
                 <option value="pending">검토 대기</option>
@@ -387,7 +389,7 @@ export default function FeedbackList({
               <select
                 className="select select-bordered select-sm"
                 value={filter.priority}
-                onChange={(e) => setFilter(prev => ({ ...prev, priority: e.target.value as any }))}
+                onChange={(e) => setFilter(prev => ({ ...prev, priority: e.target.value as "all" | "low" | "medium" | "high" | "critical" }))}
               >
                 <option value="all">모든 우선순위</option>
                 <option value="low">낮음</option>
@@ -401,7 +403,7 @@ export default function FeedbackList({
               <select
                 className="select select-bordered select-sm"
                 value={filter.category}
-                onChange={(e) => setFilter(prev => ({ ...prev, category: e.target.value as any }))}
+                onChange={(e) => setFilter(prev => ({ ...prev, category: e.target.value as "all" | "design" | "content" | "functionality" | "technical" | "other" }))}
               >
                 <option value="all">모든 카테고리</option>
                 <option value="design">디자인</option>

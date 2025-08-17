@@ -200,7 +200,7 @@ export default function ProjectsPage() {
 
   // 필터링 및 정렬된 프로젝트 목록
   const filteredProjects = useMemo(() => {
-    let filtered = mockProjects.filter((project) => {
+    const filtered = mockProjects.filter((project) => {
       // 아카이브 필터
       if (showArchived) {
         return project.status === "archived";

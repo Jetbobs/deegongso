@@ -3,24 +3,25 @@
 import { useState } from "react";
 import type React from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { TempUser, SignupFormData } from "@/types";
 
 interface SignupFormProps {
-  tempUser: any;
+  tempUser: TempUser | null;
   onComplete: () => void;
 }
 
 export default function SignupForm({ tempUser, onComplete }: SignupFormProps) {
   const { completeSignup, loading } = useAuth();
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<SignupFormData>({
     email: tempUser?.email || "",
     name: tempUser?.name || "",
     phone: "",
-    userType: "" as "client" | "designer" | "",
+    userType: "",
     company: "",
     department: "",
     experience: "",
-    specialization: [] as string[],
+    specialization: [],
     portfolio_url: "",
   });
 
@@ -33,12 +34,17 @@ export default function SignupForm({ tempUser, onComplete }: SignupFormProps) {
   };
 
   const handleSubmit = async () => {
-    if (formData.userType) {
+    if (formData.userType !== "") {
       // localStorage에 사용자 정보 저장
       localStorage.setItem("userRole", formData.userType);
       localStorage.setItem("userInfo", JSON.stringify(formData));
 
-      await completeSignup(formData as any);
+      const validFormData = {
+        ...formData,
+        userType: formData.userType as "client" | "designer"
+      };
+
+      await completeSignup(validFormData);
       onComplete();
     }
   };
@@ -59,9 +65,9 @@ export default function SignupForm({ tempUser, onComplete }: SignupFormProps) {
   const handleSpecializationToggle = (spec: string) => {
     setFormData((prev) => ({
       ...prev,
-      specialization: prev.specialization.includes(spec)
+      specialization: prev.specialization?.includes(spec)
         ? prev.specialization.filter((s) => s !== spec)
-        : [...prev.specialization, spec],
+        : [...(prev.specialization || []), spec],
     }));
   };
 
@@ -348,7 +354,7 @@ export default function SignupForm({ tempUser, onComplete }: SignupFormProps) {
                           <input
                             type="checkbox"
                             className="checkbox checkbox-sm mr-2"
-                            checked={formData.specialization.includes(spec)}
+                            checked={formData.specialization?.includes(spec) || false}
                             onChange={() => handleSpecializationToggle(spec)}
                           />
                           <span className="text-sm">{spec}</span>

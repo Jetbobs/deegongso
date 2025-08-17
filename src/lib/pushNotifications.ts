@@ -59,7 +59,7 @@ export class PushNotificationManager {
     badge?: string;
     image?: string;
     tag?: string;
-    data?: any;
+    data?: Record<string, unknown>;
     actions?: { action: string; title: string; icon?: string }[];
     silent?: boolean;
     requireInteraction?: boolean;
@@ -108,7 +108,7 @@ export class PushNotificationManager {
     icon?: string;
     badge?: string;
     tag?: string;
-    data?: any;
+    data?: Record<string, unknown>;
     actions?: { action: string; title: string; icon?: string }[];
     silent?: boolean;
     requireInteraction?: boolean;

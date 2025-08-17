@@ -98,7 +98,7 @@ export default function FeedbackVersionHistory({
     return info[changeType];
   };
 
-  const renderChangeValue = (value: any) => {
+  const renderChangeValue = (value: unknown) => {
     if (value === null || value === undefined) {
       return <span className="text-base-content/40 italic">없음</span>;
     }

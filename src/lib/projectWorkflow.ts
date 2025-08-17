@@ -345,7 +345,7 @@ export class ProjectWorkflowManager {
     from: ProjectStatus,
     to: ProjectStatus,
     userRole: "client" | "designer",
-    validationData?: Record<string, any>
+    validationData?: Record<string, unknown>
   ): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
     
@@ -379,7 +379,7 @@ export class ProjectWorkflowManager {
             }
             break;
           case "modification_count_available":
-            if (validationData.remainingModifications <= 0) {
+            if (typeof validationData.remainingModifications === 'number' && validationData.remainingModifications <= 0) {
               errors.push("남은 수정 횟수가 없습니다.");
             }
             break;
@@ -390,7 +390,7 @@ export class ProjectWorkflowManager {
     return { valid: errors.length === 0, errors };
   }
   
-  static calculateProgress(status: ProjectStatus, customData?: Record<string, any>): number {
+  static calculateProgress(status: ProjectStatus, customData?: Record<string, unknown>): number {
     const baseProgress: Record<ProjectStatus, number> = {
       creation_pending: 5,
       review_requested: 10,
@@ -409,12 +409,14 @@ export class ProjectWorkflowManager {
     
     // 커스텀 데이터를 기반으로 진행률 조정
     if (customData) {
-      if (status === "in_progress" && customData.milestonesCompleted) {
+      if (status === "in_progress" && 
+          typeof customData.milestonesCompleted === 'number' && 
+          typeof customData.totalMilestones === 'number') {
         const milestoneProgress = (customData.milestonesCompleted / customData.totalMilestones) * 30;
         progress = 30 + milestoneProgress;
       }
       
-      if (status === "feedback_period" && customData.feedbackRounds) {
+      if (status === "feedback_period" && typeof customData.feedbackRounds === 'number') {
         progress += Math.min(customData.feedbackRounds * 5, 15);
       }
     }

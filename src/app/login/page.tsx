@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import AuthForm from "@/components/auth/AuthForm";
 import SignupForm from "@/components/auth/SignupForm";
 import AuthWrapper from "@/components/auth/AuthWrapper";
+import { TempUser } from "@/types";
 
 export default function LoginPage() {
   const router = useRouter();
   const [showSignup, setShowSignup] = useState(false);
-  const [tempUser, setTempUser] = useState(null);
+  const [tempUser, setTempUser] = useState<TempUser | null>(null);
 
-  const handleNeedsSignup = (tempUserData: any) => {
+  const handleNeedsSignup = (tempUserData: TempUser) => {
     setTempUser(tempUserData);
     setShowSignup(true);
   };

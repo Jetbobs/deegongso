@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
+import Image from "next/image";
 import { FeedbackAttachment } from "@/types";
 
 interface FileUploadProps {
@@ -350,9 +351,11 @@ export default function FileUpload({
               {/* 파일 미리보기/아이콘 */}
               <div className="flex-shrink-0">
                 {file.preview ? (
-                  <img
+                  <Image
                     src={file.preview}
                     alt={file.name}
+                    width={64}
+                    height={64}
                     className="w-16 h-16 object-cover rounded"
                   />
                 ) : (

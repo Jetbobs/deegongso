@@ -150,7 +150,7 @@ export default function ProjectCreatePage() {
     }
   }, [user, guardChecked, router]);
 
-  const updateFormData = (field: keyof ProjectFormData, value: any) => {
+  const updateFormData = (field: keyof ProjectFormData, value: ProjectFormData[keyof ProjectFormData]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -173,6 +173,13 @@ export default function ProjectCreatePage() {
       "프로젝트가 생성되었습니다! 클라이언트에게 검토 요청을 발송했습니다."
     );
     router.push("/projects");
+  };
+
+  const handleTempSave = () => {
+    // TODO: API 호출로 프로젝트 임시저장
+    console.log("임시저장 데이터:", formData);
+    localStorage.setItem("temp_project_data", JSON.stringify(formData));
+    alert("프로젝트가 임시저장되었습니다.");
   };
 
   const stepTitles = {
@@ -582,7 +589,12 @@ export default function ProjectCreatePage() {
                 </button>
 
                 <div className="flex gap-3">
-                  <button className="btn btn-ghost btn-lg">임시저장</button>
+                  <button 
+                    className="btn btn-ghost btn-lg"
+                    onClick={handleTempSave}
+                  >
+                    임시저장
+                  </button>
                   {currentStep < 4 ? (
                     <button
                       className="btn btn-primary btn-lg"
@@ -638,16 +650,6 @@ function PaymentTermsInput({
     return amount;
   };
 
-  const calculatePercentage = (
-    amount: number,
-    unit: "percent" | "amount",
-    price: number
-  ) => {
-    if (unit === "amount") {
-      return Math.round((amount / price) * 100);
-    }
-    return amount;
-  };
 
   const updatePaymentTerms = (updates: Partial<PaymentTerms>) => {
     onChange({ ...paymentTerms, ...updates });
@@ -655,7 +657,7 @@ function PaymentTermsInput({
 
   const updateTwoPartTerms = (
     field: keyof NonNullable<PaymentTerms["twoPartTerms"]>,
-    value: any
+    value: NonNullable<PaymentTerms["twoPartTerms"]>[keyof NonNullable<PaymentTerms["twoPartTerms"]>]
   ) => {
     const current = paymentTerms.twoPartTerms || {
       advancePayment: {
@@ -680,7 +682,7 @@ function PaymentTermsInput({
 
   const updateThreePartTerms = (
     field: keyof NonNullable<PaymentTerms["threePartTerms"]>,
-    value: any
+    value: NonNullable<PaymentTerms["threePartTerms"]>[keyof NonNullable<PaymentTerms["threePartTerms"]>]
   ) => {
     const current = paymentTerms.threePartTerms || {
       advancePayment: {
@@ -1087,7 +1089,6 @@ function PaymentTermsInput({
 
               const isValid = total === 100;
               const isOver = total > 100;
-              const isUnder = total < 100;
 
               return (
                 <div className="flex items-center justify-between">

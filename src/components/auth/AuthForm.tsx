@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { TempUser } from "@/types";
 
 interface AuthFormProps {
-  onNeedsSignup: (tempUser: any) => void;
+  onNeedsSignup: (tempUser: TempUser) => void;
 }
 
 export default function AuthForm({ onNeedsSignup }: AuthFormProps) {
@@ -16,7 +17,7 @@ export default function AuthForm({ onNeedsSignup }: AuthFormProps) {
   const handleGoogleSignIn = async () => {
     try {
       const result = await signInWithGoogle(demoEmail || "new@gmail.com");
-      if (result?.needsSignup) {
+      if (result?.needsSignup && result.tempUser) {
         onNeedsSignup(result.tempUser);
       } else {
         router.push("/dashboard");

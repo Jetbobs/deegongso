@@ -33,6 +33,48 @@ export interface DesignerUser extends BaseUser {
 // 유니온 타입
 export type User = ClientUser | DesignerUser;
 
+// 임시 사용자 타입 (회원가입 플로우용)
+export interface TempUser {
+  id?: string;
+  email: string;
+  name: string;
+  userType?: UserRole;
+}
+
+// 회원가입 폼 데이터 타입
+export interface SignupFormData {
+  email: string;
+  name: string;
+  phone: string;
+  userType: "client" | "designer" | "";
+  company?: string;
+  department?: string;
+  experience?: string;
+  specialization?: string[];
+  portfolio_url?: string;
+}
+
+// 이벤트 핸들러 타입들
+export interface EventHandlerProps {
+  onChange?: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  onSubmit?: (e: React.FormEvent<HTMLFormElement>) => void;
+}
+
+// 파일 관련 타입
+export interface FileWithPreview extends File {
+  preview?: string;
+}
+
+// 검색 결과 타입
+export interface SearchResult {
+  id: string;
+  title: string;
+  type: 'project' | 'message' | 'user' | 'file';
+  description?: string;
+  url: string;
+}
+
 // 프로젝트 관련 타입
 export type ProjectStatus =
   | "creation_pending" // 프로젝트 생성 승인 대기 중

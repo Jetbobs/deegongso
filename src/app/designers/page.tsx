@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import AuthWrapper from "@/components/auth/AuthWrapper";
 import { UserRole } from "@/types";
@@ -143,7 +142,7 @@ export default function DesignersPage() {
 
   // 필터링된 디자이너 목록
   const filteredDesigners = useMemo(() => {
-    let filtered = mockDesigners.filter((designer) => {
+    const filtered = mockDesigners.filter((designer) => {
       // 검색어 필터
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();

@@ -94,6 +94,10 @@ export function ToastProvider({
 }: ToastProviderProps) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  }, []);
+
   const addToast = useCallback((toastData: Omit<Toast, 'id'>) => {
     const id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
     const newToast: Toast = {
@@ -114,11 +118,8 @@ export function ToastProvider({
         removeToast(id);
       }, newToast.duration);
     }
-  }, [maxToasts]);
+  }, [maxToasts, removeToast]);
 
-  const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id));
-  }, []);
 
   const clearAllToasts = useCallback(() => {
     setToasts([]);

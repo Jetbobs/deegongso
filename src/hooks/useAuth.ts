@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { TempUser, UserRole } from "@/types";
 
 // Mock 사용자 타입
 interface User {
@@ -99,7 +100,7 @@ export function useAuth() {
       }
       // 기타 모든 이메일은 기본적으로 클라이언트(ID: "1")로 처리
 
-      const newUser: Partial<User> = {
+      const newUser: TempUser = {
         id: userId,
         email,
         name: email.split("@")[0],
@@ -133,13 +134,13 @@ export function useAuth() {
     }
     // 기타 모든 이메일은 기본적으로 클라이언트(ID: "1")로 처리
 
-    const roleFromType: "client" | "designer" =
-      (userData as any).userType === "designer" ? "designer" : "client";
+    const userType = 'userType' in userData ? (userData as { userType: UserRole }).userType : 'client';
+    const roleFromType: "client" | "designer" = userType === "designer" ? "designer" : "client";
 
     const newUser: User = {
       ...userData,
       id: userId,
-      userType: (userData as any).userType ?? roleFromType,
+      userType: userType ?? roleFromType,
       role: roleFromType,
     } as User;
 

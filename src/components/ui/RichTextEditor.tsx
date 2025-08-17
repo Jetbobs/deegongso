@@ -183,7 +183,7 @@ export default function RichTextEditor({
             className={`btn btn-sm btn-ghost ${editor.isActive('blockquote') ? 'btn-active' : ''}`}
             title="인용문"
           >
-            "
+            &quot;
           </button>
 
           {/* 코드 */}

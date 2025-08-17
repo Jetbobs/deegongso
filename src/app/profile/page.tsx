@@ -6,11 +6,37 @@ import { ClientUser, DesignerUser, UserRole } from "@/types";
 import { useAuth } from "@/hooks/useAuth";
 import AuthWrapper from "@/components/auth/AuthWrapper";
 
+// 기본 사용자 정보들 (컴포넌트 외부로 이동)
+const DEFAULT_CLIENT_USER: ClientUser = {
+  id: "1",
+  name: "홍길동",
+  email: "hong@company.com",
+  phone: "010-1234-5678",
+  role: "client",
+  company: "ABC 회사",
+  department: "마케팅팀",
+  created_at: "2024-01-01",
+  updated_at: "2024-01-01",
+};
+
+const DEFAULT_DESIGNER_USER: DesignerUser = {
+  id: "2",
+  name: "김디자인",
+  email: "designer@example.com",
+  phone: "010-9876-5432",
+  role: "designer",
+  experience: "3-5년",
+  specialization: ["브랜딩", "웹 디자인", "UI/UX"],
+  portfolio_url: "https://portfolio.example.com",
+  created_at: "2024-01-01",
+  updated_at: "2024-01-01",
+};
+
 export default function ProfilePage() {
   const { user } = useAuth();
-  const [savedUserInfo, setSavedUserInfo] = useState<any>(null);
+  const [savedUserInfo, setSavedUserInfo] = useState<Record<string, unknown> | null>(null);
 
-  const userRole: UserRole = user?.role ?? (user as any)?.userType ?? "client";
+  const userRole: UserRole = user?.role ?? user?.userType ?? "client";
 
   useEffect(() => {
     // 회원가입 단계에서 저장한 사용자 추가 정보 로드
@@ -18,67 +44,40 @@ export default function ProfilePage() {
     if (storedUserInfo) setSavedUserInfo(JSON.parse(storedUserInfo));
   }, []);
 
-  // 클라이언트 기본 정보 (localStorage에 정보가 없을 때 사용)
-  const defaultClientUser: ClientUser = {
-    id: "1",
-    name: "홍길동",
-    email: "hong@company.com",
-    phone: "010-1234-5678",
-    role: "client",
-    company: "ABC 회사",
-    department: "마케팅팀",
-    created_at: "2024-01-01",
-    updated_at: "2024-01-01",
-  };
-
-  // 디자이너 기본 정보 (localStorage에 정보가 없을 때 사용)
-  const defaultDesignerUser: DesignerUser = {
-    id: "2",
-    name: "김디자인",
-    email: "designer@example.com",
-    phone: "010-9876-5432",
-    role: "designer",
-    experience: "3-5년",
-    specialization: ["브랜딩", "웹 디자인", "UI/UX"],
-    portfolio_url: "https://portfolio.example.com",
-    created_at: "2024-01-01",
-    updated_at: "2024-01-01",
-  };
-
   // 표시용 유저 정보 구성: useAuth 사용자 + 저장된 추가정보를 병합
   const userInfo: ClientUser | DesignerUser = useMemo(() => {
     if (userRole === "client") {
       return {
-        id: user?.id || defaultClientUser.id,
-        name: user?.name || defaultClientUser.name,
-        email: user?.email || defaultClientUser.email,
-        phone: user?.phone || defaultClientUser.phone,
+        id: user?.id || DEFAULT_CLIENT_USER.id,
+        name: user?.name || DEFAULT_CLIENT_USER.name,
+        email: user?.email || DEFAULT_CLIENT_USER.email,
+        phone: user?.phone || DEFAULT_CLIENT_USER.phone,
         role: "client",
         company:
-          savedUserInfo?.company ?? user?.company ?? defaultClientUser.company,
-        department: savedUserInfo?.department ?? defaultClientUser.department,
+          savedUserInfo?.company ?? user?.company ?? DEFAULT_CLIENT_USER.company,
+        department: savedUserInfo?.department ?? DEFAULT_CLIENT_USER.department,
         title: savedUserInfo?.title, // 직책(선택)
-        created_at: defaultClientUser.created_at,
-        updated_at: defaultClientUser.updated_at,
+        created_at: DEFAULT_CLIENT_USER.created_at,
+        updated_at: DEFAULT_CLIENT_USER.updated_at,
       } as ClientUser;
     }
     return {
-      id: user?.id || defaultDesignerUser.id,
-      name: user?.name || defaultDesignerUser.name,
-      email: user?.email || defaultDesignerUser.email,
-      phone: user?.phone || defaultDesignerUser.phone,
+      id: user?.id || DEFAULT_DESIGNER_USER.id,
+      name: user?.name || DEFAULT_DESIGNER_USER.name,
+      email: user?.email || DEFAULT_DESIGNER_USER.email,
+      phone: user?.phone || DEFAULT_DESIGNER_USER.phone,
       role: "designer",
       experience:
         savedUserInfo?.experience ??
         user?.experience ??
-        defaultDesignerUser.experience,
+        DEFAULT_DESIGNER_USER.experience,
       specialization:
-        savedUserInfo?.specialization ?? defaultDesignerUser.specialization,
+        savedUserInfo?.specialization ?? DEFAULT_DESIGNER_USER.specialization,
       strengths: savedUserInfo?.strengths ?? [],
       portfolio_url:
-        savedUserInfo?.portfolio_url ?? defaultDesignerUser.portfolio_url,
-      created_at: defaultDesignerUser.created_at,
-      updated_at: defaultDesignerUser.updated_at,
+        savedUserInfo?.portfolio_url ?? DEFAULT_DESIGNER_USER.portfolio_url,
+      created_at: DEFAULT_DESIGNER_USER.created_at,
+      updated_at: DEFAULT_DESIGNER_USER.updated_at,
     } as DesignerUser;
   }, [user, userRole, savedUserInfo]);
 

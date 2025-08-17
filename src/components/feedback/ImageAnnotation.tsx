@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
+import Image from "next/image";
 import { FeedbackAnnotation } from "@/types";
 
 interface ImageAnnotationProps {
@@ -388,10 +389,12 @@ export default function ImageAnnotation({
         className="relative inline-block max-w-full overflow-hidden rounded-lg border border-base-300"
         style={{ cursor: currentTool.isActive ? 'crosshair' : 'default' }}
       >
-        <img
+        <Image
           ref={imageRef}
           src={imageUrl}
-          alt={imageAlt}
+          alt={imageAlt || ""}
+          width={800}
+          height={600}
           className="max-w-full h-auto block"
           onLoad={() => setImageLoaded(true)}
           onError={() => setImageLoaded(true)} // 에러가 발생해도 로딩 상태 해제

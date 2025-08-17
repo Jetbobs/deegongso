@@ -10,8 +10,8 @@ export interface FeedbackVersion {
 
 export interface FeedbackChange {
   field: keyof Feedback;
-  old_value: any;
-  new_value: any;
+  old_value: unknown;
+  new_value: unknown;
   change_type: 'added' | 'modified' | 'removed';
 }
 

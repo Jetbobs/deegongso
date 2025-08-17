@@ -144,7 +144,7 @@ export default function EnhancedDashboardPage() {
   const [recentActivities] = useState<RecentActivity[]>(MOCK_RECENT_ACTIVITIES);
   const [upcomingDeadlines] = useState<UpcomingDeadline[]>(MOCK_UPCOMING_DEADLINES);
   const [showCharts, setShowCharts] = useState(false);
-  const { success, info } = useToastActions();
+  const { info } = useToastActions();
 
   const userRole = user?.role ?? user?.userType ?? "client";
 

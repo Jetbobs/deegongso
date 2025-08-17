@@ -212,7 +212,7 @@ export default function MessagesPage() {
 
   // 필터링된 대화 목록
   const filteredConversations = useMemo(() => {
-    let filtered = conversations.filter((conversation) => {
+    const filtered = conversations.filter((conversation) => {
       // 읽지 않은 메시지만 보기 필터
       if (showUnreadOnly && conversation.unreadCount === 0) {
         return false;
@@ -627,7 +627,7 @@ export default function MessagesPage() {
                         검색 결과가 없습니다
                       </h3>
                       <p className="text-base-content/60">
-                        "{messageSearchTerm}"에 대한 메시지를 찾을 수 없습니다.
+                        &quot;{messageSearchTerm}&quot;에 대한 메시지를 찾을 수 없습니다.
                       </p>
                     </div>
                   ) : (
