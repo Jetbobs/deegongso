@@ -16,7 +16,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
 } from "recharts";
 
 interface DashboardStats {
@@ -32,7 +32,7 @@ interface DashboardStats {
 
 interface RecentActivity {
   id: string;
-  type: 'project_update' | 'feedback_received' | 'payment' | 'message';
+  type: "project_update" | "feedback_received" | "payment" | "message";
   title: string;
   description: string;
   timestamp: string;
@@ -43,10 +43,10 @@ interface RecentActivity {
 interface UpcomingDeadline {
   id: string;
   projectName: string;
-  type: 'draft' | 'review' | 'final';
+  type: "draft" | "review" | "final";
   deadline: string;
   daysLeft: number;
-  priority: 'high' | 'medium' | 'low';
+  priority: "high" | "medium" | "low";
 }
 
 // Mock 데이터
@@ -58,7 +58,7 @@ const MOCK_STATS: DashboardStats = {
   totalRevenue: 15600000,
   averageRating: 4.8,
   responseTime: 2.3,
-  thisMonthCompleted: 3
+  thisMonthCompleted: 3,
 };
 
 const MOCK_RECENT_ACTIVITIES: RecentActivity[] = [
@@ -69,7 +69,7 @@ const MOCK_RECENT_ACTIVITIES: RecentActivity[] = [
     description: "로고 디자인 프로젝트에서 클라이언트 피드백을 받았습니다.",
     timestamp: "2024-01-23T10:30:00Z",
     icon: "💬",
-    color: "primary"
+    color: "primary",
   },
   {
     id: "2",
@@ -78,7 +78,7 @@ const MOCK_RECENT_ACTIVITIES: RecentActivity[] = [
     description: "웹사이트 UI/UX 프로젝트가 피드백 정리 단계로 진행되었습니다.",
     timestamp: "2024-01-23T09:15:00Z",
     icon: "🔄",
-    color: "info"
+    color: "info",
   },
   {
     id: "3",
@@ -87,7 +87,7 @@ const MOCK_RECENT_ACTIVITIES: RecentActivity[] = [
     description: "브랜딩 패키지 프로젝트 결제가 완료되었습니다.",
     timestamp: "2024-01-22T16:45:00Z",
     icon: "💰",
-    color: "success"
+    color: "success",
   },
   {
     id: "4",
@@ -96,8 +96,8 @@ const MOCK_RECENT_ACTIVITIES: RecentActivity[] = [
     description: "박디자이너님으로부터 메시지가 도착했습니다.",
     timestamp: "2024-01-22T14:20:00Z",
     icon: "✉️",
-    color: "warning"
-  }
+    color: "warning",
+  },
 ];
 
 const MOCK_UPCOMING_DEADLINES: UpcomingDeadline[] = [
@@ -107,15 +107,15 @@ const MOCK_UPCOMING_DEADLINES: UpcomingDeadline[] = [
     type: "review",
     deadline: "2024-01-25T23:59:59Z",
     daysLeft: 2,
-    priority: "high"
+    priority: "high",
   },
   {
-    id: "2", 
+    id: "2",
     projectName: "웹사이트 UI/UX",
     type: "draft",
     deadline: "2024-01-28T23:59:59Z",
     daysLeft: 5,
-    priority: "medium"
+    priority: "medium",
   },
   {
     id: "3",
@@ -123,8 +123,8 @@ const MOCK_UPCOMING_DEADLINES: UpcomingDeadline[] = [
     type: "final",
     deadline: "2024-02-01T23:59:59Z",
     daysLeft: 9,
-    priority: "low"
-  }
+    priority: "low",
+  },
 ];
 
 const MONTHLY_REVENUE = [
@@ -133,7 +133,7 @@ const MONTHLY_REVENUE = [
   { month: "12월", revenue: 3200000, projects: 2 },
   { month: "1월", revenue: 7500000, projects: 5 },
   { month: "2월", revenue: 5100000, projects: 3 },
-  { month: "3월", revenue: 8200000, projects: 6 }
+  { month: "3월", revenue: 8200000, projects: 6 },
 ];
 
 export default function EnhancedDashboardPage() {
@@ -142,7 +142,9 @@ export default function EnhancedDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [stats] = useState<DashboardStats>(MOCK_STATS);
   const [recentActivities] = useState<RecentActivity[]>(MOCK_RECENT_ACTIVITIES);
-  const [upcomingDeadlines] = useState<UpcomingDeadline[]>(MOCK_UPCOMING_DEADLINES);
+  const [upcomingDeadlines] = useState<UpcomingDeadline[]>(
+    MOCK_UPCOMING_DEADLINES
+  );
   const [showCharts, setShowCharts] = useState(false);
   const { info } = useToastActions();
 
@@ -165,8 +167,10 @@ export default function EnhancedDashboardPage() {
   // 데드라인 알림 체크
   useEffect(() => {
     if (!loading) {
-      const criticalDeadlines = upcomingDeadlines.filter(d => d.daysLeft <= 3);
-      criticalDeadlines.forEach(deadline => {
+      const criticalDeadlines = upcomingDeadlines.filter(
+        (d) => d.daysLeft <= 3
+      );
+      criticalDeadlines.forEach((deadline) => {
         ProjectNotifications.deadlineApproaching(
           deadline.projectName,
           deadline.daysLeft,
@@ -185,40 +189,40 @@ export default function EnhancedDashboardPage() {
 
     if (diffMins < 60) return `${diffMins}분 전`;
     if (diffHours < 24) return `${diffHours}시간 전`;
-    return date.toLocaleDateString('ko-KR');
+    return date.toLocaleDateString("ko-KR");
   };
 
-  const getDeadlineTypeLabel = (type: UpcomingDeadline['type']) => {
+  const getDeadlineTypeLabel = (type: UpcomingDeadline["type"]) => {
     const labels = {
       draft: "초안 제출",
-      review: "검토 완료", 
-      final: "최종 제출"
+      review: "검토 완료",
+      final: "최종 제출",
     };
     return labels[type];
   };
 
-  const getPriorityColor = (priority: UpcomingDeadline['priority']) => {
+  const getPriorityColor = (priority: UpcomingDeadline["priority"]) => {
     const colors = {
       high: "error",
       medium: "warning",
-      low: "success"
+      low: "success",
     };
     return colors[priority];
   };
 
   const handleQuickAction = (action: string) => {
     switch (action) {
-      case 'new_project':
-        router.push('/projects/create');
+      case "new_project":
+        router.push("/projects/create");
         break;
-      case 'view_messages':
-        router.push('/messages');
+      case "view_messages":
+        router.push("/messages");
         break;
-      case 'find_designers':
-        router.push('/designers');
+      case "find_designers":
+        router.push("/designers");
         break;
-      case 'settings':
-        router.push('/settings');
+      case "settings":
+        router.push("/settings");
         break;
       default:
         info(`${action} 기능은 준비 중입니다.`);
@@ -228,14 +232,11 @@ export default function EnhancedDashboardPage() {
   if (loading) {
     return (
       <AuthWrapper requireAuth={true}>
-        <DashboardLayout
-          title="대시보드"
-          userRole={userRole}
-        >
+        <DashboardLayout title="대시보드" userRole={userRole}>
           <div className="space-y-6">
             {/* 헤더 스켈레톤 */}
             <div className="skeleton h-16 w-full" />
-            
+
             {/* 통계 카드 스켈레톤 */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {Array.from({ length: 4 }).map((_, i) => (
@@ -256,10 +257,7 @@ export default function EnhancedDashboardPage() {
 
   return (
     <AuthWrapper requireAuth={true}>
-      <DashboardLayout
-        title="대시보드"
-        userRole={userRole}
-      >
+      <DashboardLayout title="대시보드" userRole={userRole}>
         <div className="space-y-8">
           {/* 환영 헤더 */}
           <div className="card bg-gradient-to-r from-primary to-primary/80 text-primary-content shadow-lg">
@@ -269,18 +267,22 @@ export default function EnhancedDashboardPage() {
                   <h1 className="text-2xl font-bold mb-2">
                     안녕하세요, {user?.name || user?.email || "사용자"}님! 👋
                   </h1>
-                  <p className="text-primary-content/80">
+                  <p className="text-primary-content/90">
                     {userRole === "client"
                       ? "오늘도 멋진 프로젝트를 만들어보세요."
                       : "창의적인 작업으로 클라이언트를 만족시켜보세요!"}
                   </p>
                 </div>
-                
+
                 <div className="hidden lg:block">
                   <div className="stats bg-primary-content/10 text-primary-content">
                     <div className="stat">
-                      <div className="stat-value text-2xl">{stats.activeProjects}</div>
-                      <div className="stat-title text-primary-content/80">진행 중</div>
+                      <div className="stat-value text-2xl">
+                        {stats.activeProjects}
+                      </div>
+                      <div className="stat-title text-primary-content/90">
+                        진행 중
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -294,9 +296,7 @@ export default function EnhancedDashboardPage() {
               <div className="card-body">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="card-title text-sm text-base-content/60">
-                      진행 중인 프로젝트
-                    </h2>
+                    <h2 className="card-title text-sm">진행 중인 프로젝트</h2>
                     <div className="text-3xl font-bold text-primary">
                       {stats.activeProjects}
                     </div>
@@ -338,9 +338,7 @@ export default function EnhancedDashboardPage() {
                     <div className="text-3xl font-bold text-success">
                       {stats.averageRating}★
                     </div>
-                    <div className="text-sm text-base-content/60">
-                      5점 만점
-                    </div>
+                    <div className="text-sm text-base-content/60">5점 만점</div>
                   </div>
                   <div className="text-4xl opacity-20">⭐</div>
                 </div>
@@ -355,10 +353,9 @@ export default function EnhancedDashboardPage() {
                       {userRole === "client" ? "평균 응답시간" : "총 수익"}
                     </h2>
                     <div className="text-3xl font-bold text-info">
-                      {userRole === "client" 
+                      {userRole === "client"
                         ? `${stats.responseTime}h`
-                        : `${Math.round(stats.totalRevenue / 1000000)}M`
-                      }
+                        : `${Math.round(stats.totalRevenue / 1000000)}M`}
                     </div>
                     <div className="text-sm text-base-content/60">
                       {userRole === "client" ? "평균 응답" : "원 (총 수익)"}
@@ -380,7 +377,7 @@ export default function EnhancedDashboardPage() {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">최근 활동</h3>
                   <button
-                    onClick={() => router.push('/activities')}
+                    onClick={() => router.push("/activities")}
                     className="btn btn-ghost btn-sm"
                   >
                     전체 보기
@@ -389,11 +386,16 @@ export default function EnhancedDashboardPage() {
 
                 <div className="space-y-3">
                   {recentActivities.map((activity) => (
-                    <div key={activity.id} className="flex items-start space-x-3">
-                      <div className={`
+                    <div
+                      key={activity.id}
+                      className="flex items-start space-x-3"
+                    >
+                      <div
+                        className={`
                         w-10 h-10 rounded-full flex items-center justify-center text-sm
                         bg-${activity.color}/10 text-${activity.color}
-                      `}>
+                      `}
+                      >
                         {activity.icon}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -417,7 +419,7 @@ export default function EnhancedDashboardPage() {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">예정된 마감일</h3>
                   <button
-                    onClick={() => router.push('/projects')}
+                    onClick={() => router.push("/projects")}
                     className="btn btn-ghost btn-sm"
                   >
                     전체 보기
@@ -426,15 +428,24 @@ export default function EnhancedDashboardPage() {
 
                 <div className="space-y-3">
                   {upcomingDeadlines.map((deadline) => (
-                    <div key={deadline.id} className="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                    <div
+                      key={deadline.id}
+                      className="flex items-center justify-between p-3 bg-base-200 rounded-lg"
+                    >
                       <div className="flex-1">
-                        <p className="font-medium text-sm">{deadline.projectName}</p>
+                        <p className="font-medium text-sm">
+                          {deadline.projectName}
+                        </p>
                         <p className="text-xs text-base-content/60">
                           {getDeadlineTypeLabel(deadline.type)} 마감
                         </p>
                       </div>
                       <div className="text-right">
-                        <span className={`badge badge-${getPriorityColor(deadline.priority)} badge-sm`}>
+                        <span
+                          className={`badge badge-${getPriorityColor(
+                            deadline.priority
+                          )} badge-sm`}
+                        >
                           {deadline.daysLeft}일 남음
                         </span>
                         <p className="text-xs text-base-content/60 mt-1">
@@ -456,20 +467,28 @@ export default function EnhancedDashboardPage() {
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={MONTHLY_REVENUE}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-base-300" />
-                      <XAxis dataKey="month" className="text-base-content" />
-                      <YAxis 
-                        className="text-base-content" 
-                        tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        className="stroke-base-300"
                       />
-                      <Tooltip 
-                        formatter={(value: number) => [`${value.toLocaleString()}원`, '수익']}
-                        labelStyle={{ color: 'inherit' }}
+                      <XAxis dataKey="month" className="text-base-content" />
+                      <YAxis
+                        className="text-base-content"
+                        tickFormatter={(value) =>
+                          `${(value / 1000000).toFixed(1)}M`
+                        }
+                      />
+                      <Tooltip
+                        formatter={(value: number) => [
+                          `${value.toLocaleString()}원`,
+                          "수익",
+                        ]}
+                        labelStyle={{ color: "inherit" }}
                         contentStyle={{
-                          backgroundColor: 'hsl(var(--b1))',
-                          border: '1px solid hsl(var(--b3))',
-                          borderRadius: '0.5rem',
-                          color: 'hsl(var(--bc))'
+                          backgroundColor: "hsl(var(--b1))",
+                          border: "1px solid hsl(var(--b3))",
+                          borderRadius: "0.5rem",
+                          color: "hsl(var(--bc))",
                         }}
                       />
                       <Legend />
@@ -485,24 +504,37 @@ export default function EnhancedDashboardPage() {
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
-                
+
                 {/* 수익 요약 */}
                 <div className="grid grid-cols-3 gap-4 mt-6">
                   <div className="text-center">
                     <p className="text-2xl font-bold text-primary">
-                      {MONTHLY_REVENUE[MONTHLY_REVENUE.length - 1].revenue.toLocaleString()}원
+                      {MONTHLY_REVENUE[
+                        MONTHLY_REVENUE.length - 1
+                      ].revenue.toLocaleString()}
+                      원
                     </p>
                     <p className="text-sm text-base-content/60">이번 달 수익</p>
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold text-success">
-                      {Math.round(MONTHLY_REVENUE.reduce((sum, item) => sum + item.revenue, 0) / MONTHLY_REVENUE.length).toLocaleString()}원
+                      {Math.round(
+                        MONTHLY_REVENUE.reduce(
+                          (sum, item) => sum + item.revenue,
+                          0
+                        ) / MONTHLY_REVENUE.length
+                      ).toLocaleString()}
+                      원
                     </p>
                     <p className="text-sm text-base-content/60">평균 월 수익</p>
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold text-warning">
-                      {MONTHLY_REVENUE.reduce((sum, item) => sum + item.projects, 0)}개
+                      {MONTHLY_REVENUE.reduce(
+                        (sum, item) => sum + item.projects,
+                        0
+                      )}
+                      개
                     </p>
                     <p className="text-sm text-base-content/60">총 프로젝트</p>
                   </div>
@@ -512,9 +544,7 @@ export default function EnhancedDashboardPage() {
           )}
 
           {/* 차트 섹션 */}
-          {showCharts && (
-            <DashboardCharts userRole={userRole} />
-          )}
+          {showCharts && <DashboardCharts userRole={userRole} />}
 
           {/* 빠른 액션 */}
           <div className="card bg-base-100 shadow-sm">
@@ -522,30 +552,30 @@ export default function EnhancedDashboardPage() {
               <h3 className="text-lg font-semibold mb-4">빠른 작업</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <button
-                  onClick={() => handleQuickAction('new_project')}
+                  onClick={() => handleQuickAction("new_project")}
                   className="btn btn-outline btn-lg"
                 >
                   새 프로젝트
                 </button>
-                
+
                 <button
-                  onClick={() => handleQuickAction('view_messages')}
+                  onClick={() => handleQuickAction("view_messages")}
                   className="btn btn-outline btn-lg"
                 >
                   메시지 확인
                 </button>
-                
+
                 {userRole === "client" && (
                   <button
-                    onClick={() => handleQuickAction('find_designers')}
+                    onClick={() => handleQuickAction("find_designers")}
                     className="btn btn-outline btn-lg"
                   >
                     디자이너 찾기
                   </button>
                 )}
-                
+
                 <button
-                  onClick={() => handleQuickAction('settings')}
+                  onClick={() => handleQuickAction("settings")}
                   className="btn btn-outline btn-lg"
                 >
                   설정

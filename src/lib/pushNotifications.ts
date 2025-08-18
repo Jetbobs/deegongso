@@ -1,12 +1,15 @@
 // 브라우저 푸시 알림 관리자
 export class PushNotificationManager {
   private static instance: PushNotificationManager;
-  private permission: NotificationPermission = 'default';
+  private permission: NotificationPermission = "default";
   private isSupported: boolean = false;
 
   private constructor() {
-    this.checkSupport();
-    this.updatePermission();
+    // 브라우저 환경에서만 초기화
+    if (typeof window !== "undefined") {
+      this.checkSupport();
+      this.updatePermission();
+    }
   }
 
   static getInstance(): PushNotificationManager {
@@ -17,36 +20,41 @@ export class PushNotificationManager {
   }
 
   private checkSupport(): void {
-    this.isSupported = 'Notification' in window && 'serviceWorker' in navigator;
+    if (typeof window !== "undefined" && typeof navigator !== "undefined") {
+      this.isSupported =
+        "Notification" in window && "serviceWorker" in navigator;
+    }
   }
 
   private updatePermission(): void {
-    if (this.isSupported) {
+    if (this.isSupported && typeof window !== "undefined") {
       this.permission = Notification.permission;
     }
   }
 
   // 푸시 알림 권한 요청
   async requestPermission(): Promise<boolean> {
+    if (typeof window === "undefined") return false;
+
     if (!this.isSupported) {
-      console.warn('Push notifications are not supported in this browser');
+      console.warn("Push notifications are not supported in this browser");
       return false;
     }
 
-    if (this.permission === 'granted') {
+    if (this.permission === "granted") {
       return true;
     }
 
-    if (this.permission === 'denied') {
+    if (this.permission === "denied") {
       return false;
     }
 
     try {
       const permission = await Notification.requestPermission();
       this.permission = permission;
-      return permission === 'granted';
+      return permission === "granted";
     } catch (error) {
-      console.error('Failed to request notification permission:', error);
+      console.error("Failed to request notification permission:", error);
       return false;
     }
   }
@@ -65,18 +73,20 @@ export class PushNotificationManager {
     requireInteraction?: boolean;
     onClick?: () => void;
   }): Promise<Notification | null> {
+    if (typeof window === "undefined") return null;
+
     const hasPermission = await this.requestPermission();
     if (!hasPermission) return null;
 
     try {
       const notification = new Notification(options.title, {
         body: options.body,
-        icon: options.icon || '/favicon.ico',
+        icon: options.icon || "/favicon.ico",
         badge: options.badge,
         tag: options.tag,
         data: options.data,
         silent: options.silent,
-        requireInteraction: options.requireInteraction
+        requireInteraction: options.requireInteraction,
       });
 
       // 클릭 이벤트 처리
@@ -96,7 +106,7 @@ export class PushNotificationManager {
 
       return notification;
     } catch (error) {
-      console.error('Failed to show notification:', error);
+      console.error("Failed to show notification:", error);
       return null;
     }
   }
@@ -113,7 +123,7 @@ export class PushNotificationManager {
     silent?: boolean;
     requireInteraction?: boolean;
   }): Promise<void> {
-    if (!this.isSupported) return;
+    if (typeof window === "undefined" || !this.isSupported) return;
 
     const hasPermission = await this.requestPermission();
     if (!hasPermission) return;
@@ -122,21 +132,23 @@ export class PushNotificationManager {
       const registration = await navigator.serviceWorker.ready;
       await registration.showNotification(options.title, {
         body: options.body,
-        icon: options.icon || '/favicon.ico',
-        badge: options.badge || '/favicon.ico',
+        icon: options.icon || "/favicon.ico",
+        badge: options.badge || "/favicon.ico",
         tag: options.tag,
         data: options.data,
         silent: options.silent,
-        requireInteraction: options.requireInteraction
+        requireInteraction: options.requireInteraction,
       });
     } catch (error) {
-      console.error('Failed to show service worker notification:', error);
+      console.error("Failed to show service worker notification:", error);
     }
   }
 
   // 권한 상태 확인
   getPermissionStatus(): NotificationPermission {
-    this.updatePermission();
+    if (typeof window !== "undefined") {
+      this.updatePermission();
+    }
     return this.permission;
   }
 
@@ -147,108 +159,133 @@ export class PushNotificationManager {
 
   // 특정 태그의 알림들 닫기
   async closeNotificationsByTag(tag: string): Promise<void> {
-    if (!this.isSupported) return;
+    if (typeof window === "undefined" || !this.isSupported) return;
 
     try {
       const registration = await navigator.serviceWorker.ready;
       const notifications = await registration.getNotifications({ tag });
-      notifications.forEach(notification => notification.close());
+      notifications.forEach((notification) => notification.close());
     } catch (error) {
-      console.error('Failed to close notifications:', error);
+      console.error("Failed to close notifications:", error);
     }
   }
 
   // 모든 알림 닫기
   async closeAllNotifications(): Promise<void> {
-    if (!this.isSupported) return;
+    if (typeof window === "undefined" || !this.isSupported) return;
 
     try {
       const registration = await navigator.serviceWorker.ready;
       const notifications = await registration.getNotifications();
-      notifications.forEach(notification => notification.close());
+      notifications.forEach((notification) => notification.close());
     } catch (error) {
-      console.error('Failed to close all notifications:', error);
+      console.error("Failed to close all notifications:", error);
     }
   }
 }
 
-// 편의성 함수들
-const pushManager = PushNotificationManager.getInstance();
+// 편의성 함수들 - 조건부 초기화
+let pushManager: PushNotificationManager | null = null;
 
-export const showPushNotification = (options: Parameters<typeof pushManager.showNotification>[0]) => {
-  return pushManager.showNotification(options);
+function getPushManager(): PushNotificationManager | null {
+  if (typeof window === "undefined") return null;
+  if (!pushManager) {
+    pushManager = PushNotificationManager.getInstance();
+  }
+  return pushManager;
+}
+
+export const showPushNotification = (
+  options: Parameters<PushNotificationManager["showNotification"]>[0]
+) => {
+  const manager = getPushManager();
+  return manager ? manager.showNotification(options) : Promise.resolve(null);
 };
 
 export const requestNotificationPermission = () => {
-  return pushManager.requestPermission();
+  const manager = getPushManager();
+  return manager ? manager.requestPermission() : Promise.resolve(false);
 };
 
-export const getNotificationPermission = () => {
-  return pushManager.getPermissionStatus();
+export const getNotificationPermission = (): NotificationPermission => {
+  const manager = getPushManager();
+  return manager ? manager.getPermissionStatus() : "default";
 };
 
 // 프로젝트 관련 알림 템플릿
 export const ProjectNotifications = {
   feedbackReceived: (projectName: string, onClick?: () => void) => {
     return showPushNotification({
-      title: '새로운 피드백',
+      title: "새로운 피드백",
       body: `${projectName} 프로젝트에 새 피드백이 도착했습니다.`,
-      icon: '/favicon.ico',
-      tag: 'feedback',
-      onClick
+      icon: "/favicon.ico",
+      tag: "feedback",
+      onClick,
     });
   },
 
-  statusChanged: (projectName: string, newStatus: string, onClick?: () => void) => {
+  statusChanged: (
+    projectName: string,
+    newStatus: string,
+    onClick?: () => void
+  ) => {
     return showPushNotification({
-      title: '프로젝트 상태 변경',
+      title: "프로젝트 상태 변경",
       body: `${projectName}이(가) ${newStatus} 상태로 변경되었습니다.`,
-      icon: '/favicon.ico',
-      tag: 'status-change',
-      onClick
+      icon: "/favicon.ico",
+      tag: "status-change",
+      onClick,
     });
   },
 
-  deadlineApproaching: (projectName: string, daysLeft: number, onClick?: () => void) => {
+  deadlineApproaching: (
+    projectName: string,
+    daysLeft: number,
+    onClick?: () => void
+  ) => {
     return showPushNotification({
-      title: '마감일 알림',
+      title: "마감일 알림",
       body: `${projectName} 마감까지 ${daysLeft}일 남았습니다.`,
-      icon: '/favicon.ico',
-      tag: 'deadline',
+      icon: "/favicon.ico",
+      tag: "deadline",
       requireInteraction: true,
-      onClick
+      onClick,
     });
   },
 
-  messageReceived: (senderName: string, message: string, onClick?: () => void) => {
+  messageReceived: (
+    senderName: string,
+    message: string,
+    onClick?: () => void
+  ) => {
     return showPushNotification({
       title: `${senderName}님의 새 메시지`,
-      body: message.length > 50 ? message.substring(0, 50) + '...' : message,
-      icon: '/favicon.ico',
-      tag: 'message',
-      onClick
+      body: message.length > 50 ? message.substring(0, 50) + "..." : message,
+      icon: "/favicon.ico",
+      tag: "message",
+      onClick,
     });
   },
 
   completionRequested: (projectName: string, onClick?: () => void) => {
     return showPushNotification({
-      title: '완료 승인 요청',
+      title: "완료 승인 요청",
       body: `${projectName} 프로젝트 완료 승인이 요청되었습니다.`,
-      icon: '/favicon.ico',
-      tag: 'completion',
+      icon: "/favicon.ico",
+      tag: "completion",
       requireInteraction: true,
-      onClick
+      onClick,
     });
-  }
+  },
 };
 
 // 알림 설정 관리
 export class NotificationSettings {
-  private static readonly STORAGE_KEY = 'deeo_notification_settings';
+  private static readonly STORAGE_KEY = "deeo_notification_settings";
 
   static getSettings() {
-    if (typeof window === 'undefined') return this.getDefaultSettings();
-    
+    if (typeof window === "undefined") return this.getDefaultSettings();
+
     const saved = localStorage.getItem(this.STORAGE_KEY);
     if (!saved) return this.getDefaultSettings();
 
@@ -260,7 +297,7 @@ export class NotificationSettings {
   }
 
   static saveSettings(settings: Partial<NotificationSettingsType>) {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
 
     const current = this.getSettings();
     const updated = { ...current, ...settings };
@@ -280,9 +317,9 @@ export class NotificationSettings {
       sound: true,
       quietHours: {
         enabled: false,
-        start: '22:00',
-        end: '08:00'
-      }
+        start: "22:00",
+        end: "08:00",
+      },
     };
   }
 }
@@ -300,7 +337,7 @@ export interface NotificationSettingsType {
   quietHours: {
     enabled: boolean;
     start: string; // HH:MM
-    end: string;   // HH:MM
+    end: string; // HH:MM
   };
 }
 
@@ -310,10 +347,12 @@ export function isQuietHours(settings: NotificationSettingsType): boolean {
 
   const now = new Date();
   const currentTime = now.getHours() * 100 + now.getMinutes();
-  
-  const [startHour, startMin] = settings.quietHours.start.split(':').map(Number);
-  const [endHour, endMin] = settings.quietHours.end.split(':').map(Number);
-  
+
+  const [startHour, startMin] = settings.quietHours.start
+    .split(":")
+    .map(Number);
+  const [endHour, endMin] = settings.quietHours.end.split(":").map(Number);
+
   const startTime = startHour * 100 + startMin;
   const endTime = endHour * 100 + endMin;
 

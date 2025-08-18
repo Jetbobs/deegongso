@@ -34,7 +34,10 @@ const DEFAULT_DESIGNER_USER: DesignerUser = {
 
 export default function ProfilePage() {
   const { user } = useAuth();
-  const [savedUserInfo, setSavedUserInfo] = useState<Record<string, unknown> | null>(null);
+  const [savedUserInfo, setSavedUserInfo] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
 
   const userRole: UserRole = user?.role ?? user?.userType ?? "client";
 
@@ -54,7 +57,9 @@ export default function ProfilePage() {
         phone: user?.phone || DEFAULT_CLIENT_USER.phone,
         role: "client",
         company:
-          savedUserInfo?.company ?? user?.company ?? DEFAULT_CLIENT_USER.company,
+          savedUserInfo?.company ??
+          user?.company ??
+          DEFAULT_CLIENT_USER.company,
         department: savedUserInfo?.department ?? DEFAULT_CLIENT_USER.department,
         title: savedUserInfo?.title, // 직책(선택)
         created_at: DEFAULT_CLIENT_USER.created_at,
@@ -139,7 +144,7 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <div className="text-sm font-medium text-base-content/70">
+                  <div className="text-sm font-medium text-mac-secondary">
                     이메일
                   </div>
                   <div className="text-base font-semibold">
@@ -148,7 +153,7 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <div className="text-sm font-medium text-base-content/70">
+                  <div className="text-sm font-medium text-mac-secondary">
                     연락처
                   </div>
                   <div className="text-base font-semibold">
@@ -160,7 +165,7 @@ export default function ProfilePage() {
                 {userInfo.role === "client" && (
                   <>
                     <div className="space-y-2">
-                      <div className="text-sm font-medium text-base-content/70">
+                      <div className="text-sm font-medium text-mac-secondary">
                         회사
                       </div>
                       <div className="text-base font-semibold">
@@ -169,7 +174,7 @@ export default function ProfilePage() {
                     </div>
 
                     <div className="space-y-2">
-                      <div className="text-sm font-medium text-base-content/70">
+                      <div className="text-sm font-medium text-mac-secondary">
                         부서
                       </div>
                       <div className="text-base font-semibold">
@@ -178,7 +183,7 @@ export default function ProfilePage() {
                     </div>
 
                     <div className="space-y-2">
-                      <div className="text-sm font-medium text-base-content/70">
+                      <div className="text-sm font-medium text-mac-secondary">
                         직책
                       </div>
                       <div className="text-base font-semibold">
@@ -192,7 +197,7 @@ export default function ProfilePage() {
                 {userInfo.role === "designer" && (
                   <>
                     <div className="space-y-2">
-                      <div className="text-sm font-medium text-base-content/70">
+                      <div className="text-sm font-medium text-mac-secondary">
                         경력
                       </div>
                       <div className="text-base font-semibold">
@@ -201,7 +206,7 @@ export default function ProfilePage() {
                     </div>
 
                     <div className="space-y-2">
-                      <div className="text-sm font-medium text-base-content/70">
+                      <div className="text-sm font-medium text-mac-secondary">
                         전문분야
                       </div>
                       <div className="text-base font-semibold">
@@ -220,7 +225,7 @@ export default function ProfilePage() {
                     </div>
 
                     <div className="space-y-2">
-                      <div className="text-sm font-medium text-base-content/70">
+                      <div className="text-sm font-medium text-mac-secondary">
                         강점
                       </div>
                       <div className="text-base font-semibold">
@@ -236,7 +241,7 @@ export default function ProfilePage() {
                     </div>
 
                     <div className="space-y-2 md:col-span-2">
-                      <div className="text-sm font-medium text-base-content/70">
+                      <div className="text-sm font-medium text-mac-secondary">
                         포트폴리오
                       </div>
                       <div className="text-base font-semibold">

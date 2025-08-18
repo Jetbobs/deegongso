@@ -41,7 +41,7 @@ export default function SignupForm({ tempUser, onComplete }: SignupFormProps) {
 
       const validFormData = {
         ...formData,
-        userType: formData.userType as "client" | "designer"
+        userType: formData.userType as "client" | "designer",
       };
 
       await completeSignup(validFormData);
@@ -147,7 +147,7 @@ export default function SignupForm({ tempUser, onComplete }: SignupFormProps) {
                   disabled
                 />
                 <div className="mt-1">
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm text-mac-secondary">
                     Google 계정에서 가져온 이메일입니다
                   </span>
                 </div>
@@ -169,7 +169,7 @@ export default function SignupForm({ tempUser, onComplete }: SignupFormProps) {
                   }
                 />
                 <div className="mt-1">
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm text-mac-secondary">
                     프로젝트 관리 시 사용될 이름입니다
                   </span>
                 </div>
@@ -190,7 +190,7 @@ export default function SignupForm({ tempUser, onComplete }: SignupFormProps) {
                   maxLength={13}
                 />
                 <div className="mt-1">
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm text-mac-secondary">
                     프로젝트 관련 연락을 위해 필요합니다
                   </span>
                 </div>
@@ -271,7 +271,7 @@ export default function SignupForm({ tempUser, onComplete }: SignupFormProps) {
                   <div className="flex flex-col">
                     <div className="mb-2">
                       <span className="font-medium text-base">
-                        회사명 <span className="text-gray-500">(선택)</span>
+                        회사명 <span className="text-mac-muted">(선택)</span>
                       </span>
                     </div>
                     <input
@@ -284,7 +284,7 @@ export default function SignupForm({ tempUser, onComplete }: SignupFormProps) {
                       }
                     />
                     <div className="mt-1">
-                      <span className="text-sm text-gray-500">
+                      <span className="text-sm text-mac-secondary">
                         프로젝트 관리 시 표시될 회사 정보입니다
                       </span>
                     </div>
@@ -293,7 +293,7 @@ export default function SignupForm({ tempUser, onComplete }: SignupFormProps) {
                   <div className="flex flex-col">
                     <div className="mb-2">
                       <span className="font-medium text-base">
-                        부서 <span className="text-gray-500">(선택)</span>
+                        부서 <span className="text-mac-muted">(선택)</span>
                       </span>
                     </div>
                     <input
@@ -306,7 +306,7 @@ export default function SignupForm({ tempUser, onComplete }: SignupFormProps) {
                       }
                     />
                     <div className="mt-1">
-                      <span className="text-sm text-gray-500">
+                      <span className="text-sm text-mac-secondary">
                         소속 부서나 팀 정보입니다
                       </span>
                     </div>
@@ -319,7 +319,7 @@ export default function SignupForm({ tempUser, onComplete }: SignupFormProps) {
                   <div className="flex flex-col">
                     <div className="mb-2">
                       <span className="font-medium text-base">
-                        경력 <span className="text-gray-500">(선택)</span>
+                        경력 <span className="text-mac-muted">(선택)</span>
                       </span>
                     </div>
                     <select
@@ -336,7 +336,7 @@ export default function SignupForm({ tempUser, onComplete }: SignupFormProps) {
                       <option value="5년 이상">5년 이상</option>
                     </select>
                     <div className="mt-1">
-                      <span className="text-sm text-gray-500">
+                      <span className="text-sm text-mac-secondary">
                         클라이언트가 디자이너를 선택할 때 참고 정보로 활용됩니다
                       </span>
                     </div>
@@ -345,7 +345,7 @@ export default function SignupForm({ tempUser, onComplete }: SignupFormProps) {
                   <div className="flex flex-col">
                     <div className="mb-2">
                       <span className="font-medium text-base">
-                        전문분야 <span className="text-gray-500">(선택)</span>
+                        전문분야 <span className="text-mac-muted">(선택)</span>
                       </span>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -354,7 +354,9 @@ export default function SignupForm({ tempUser, onComplete }: SignupFormProps) {
                           <input
                             type="checkbox"
                             className="checkbox checkbox-sm mr-2"
-                            checked={formData.specialization?.includes(spec) || false}
+                            checked={
+                              formData.specialization?.includes(spec) || false
+                            }
                             onChange={() => handleSpecializationToggle(spec)}
                           />
                           <span className="text-sm">{spec}</span>
@@ -362,7 +364,7 @@ export default function SignupForm({ tempUser, onComplete }: SignupFormProps) {
                       ))}
                     </div>
                     <div className="mt-1">
-                      <span className="text-sm text-gray-500">
+                      <span className="text-sm text-mac-secondary">
                         전문적으로 다루는 디자인 분야를 선택해주세요
                       </span>
                     </div>
@@ -372,7 +374,7 @@ export default function SignupForm({ tempUser, onComplete }: SignupFormProps) {
                     <div className="mb-2">
                       <span className="font-medium text-base">
                         포트폴리오 URL{" "}
-                        <span className="text-gray-500">(선택)</span>
+                        <span className="text-mac-muted">(선택)</span>
                       </span>
                     </div>
                     <input
@@ -388,7 +390,7 @@ export default function SignupForm({ tempUser, onComplete }: SignupFormProps) {
                       }
                     />
                     <div className="mt-1">
-                      <span className="text-sm text-gray-500">
+                      <span className="text-sm text-mac-secondary">
                         포트폴리오나 작업물을 볼 수 있는 웹사이트 주소
                       </span>
                     </div>

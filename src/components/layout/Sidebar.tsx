@@ -18,8 +18,8 @@ const Sidebar = ({ userRole, isOpen, onClose }: SidebarProps) => {
     const items: NavigationItem[] = [
       { label: "대시보드", href: "/dashboard", icon: "🏠" },
       { label: "내 프로젝트", href: "/projects", icon: "📁" },
-      { label: "계약 관리", href: "/contracts", icon: "📋" },
-      { label: "메시지", href: "/messages", icon: "💬", badge: 3 },
+      // { label: "계약 관리", href: "/contracts", icon: "📋" },
+      // { label: "메시지", href: "/messages", icon: "💬", badge: 3 },
       { label: "설정", href: "/settings", icon: "⚙️" },
     ];
     return items;
