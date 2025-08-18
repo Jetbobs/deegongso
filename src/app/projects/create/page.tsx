@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import AuthWrapper from "@/components/auth/AuthWrapper";
-import { UserRole } from "@/types";
+import { UserRole, ProjectProposal } from "@/types";
+import DesignerProposalForm from "@/components/project/DesignerProposalForm";
 
 // 단계 타입 정의
 type Step = 1 | 2 | 3 | 4;

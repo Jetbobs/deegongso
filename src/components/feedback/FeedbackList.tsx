@@ -13,6 +13,7 @@ interface FeedbackListProps {
   onDelete?: (feedbackId: string) => void;
   showActions?: boolean;
   groupByStatus?: boolean;
+  renderExtraInfo?: (feedback: Feedback) => React.ReactNode; // 수정요청 관련 추가 정보 렌더링
 }
 
 export default function FeedbackList({
@@ -22,7 +23,8 @@ export default function FeedbackList({
   onStatusChange,
   onDelete,
   showActions = true,
-  groupByStatus = false
+  groupByStatus = false,
+  renderExtraInfo
 }: FeedbackListProps) {
   const { user } = useAuth();
   const [expandedFeedbacks, setExpandedFeedbacks] = useState<Set<string>>(new Set());
@@ -300,6 +302,9 @@ export default function FeedbackList({
               </div>
             </div>
           )}
+
+          {/* 추가 정보 (수정요청 관련) */}
+          {renderExtraInfo && renderExtraInfo(feedback)}
 
           {/* 메타데이터 */}
           <div className="flex items-center justify-between text-sm text-base-content/60 pt-2 border-t">

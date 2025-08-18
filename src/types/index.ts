@@ -89,6 +89,101 @@ export type ProjectStatus =
   | "archived" // 아카이브됨
   | "cancelled"; // 취소
 
+// 프로젝트 협업 상태
+export type ProjectCollaborationStatus = 
+  | "draft" // 디자이너 초안 작성중
+  | "designer_review" // 디자이너 검토중
+  | "client_input_required" // 클라이언트 정보 입력 대기
+  | "client_reviewing" // 클라이언트 검토중  
+  | "mutual_review" // 상호 검토중
+  | "approved" // 양측 승인 완료
+  | "rejected" // 거절됨
+  | "revision_needed"; // 수정 필요
+
+// 협업 기반 프로젝트 제안서
+export interface ProjectProposal {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  collaboration_status: ProjectCollaborationStatus;
+  
+  // 디자이너 작성 부분
+  designer_section: {
+    service_scope: string; // 서비스 범위
+    estimated_price: number;
+    total_modification_count: number;
+    suggested_timeline: {
+      total_duration: number; // 총 소요기간 (일)
+      draft_deadline: string;
+      first_review_deadline: string;
+      final_review_deadline: string;
+    };
+    payment_terms: any; // PaymentTerms 타입 참조
+    designer_notes: string; // 디자이너 전문 의견
+    portfolio_references?: string[]; // 포트폴리오 참조
+  };
+  
+  // 클라이언트 작성 부분
+  client_section?: {
+    detailed_requirements: string; // 구체적 요구사항
+    reference_materials: string[]; // 참고자료 파일 경로
+    preferred_timeline?: {
+      start_date: string;
+      end_date: string;
+      special_deadlines?: string; // 특별한 마감일정
+    };
+    budget_feedback?: {
+      is_acceptable: boolean;
+      counter_offer?: number;
+      budget_notes?: string;
+    };
+    additional_requests: string; // 추가 요청사항
+    client_notes: string; // 클라이언트 메모
+  };
+  
+  // 공통 정보
+  client_email: string;
+  client_company?: string;
+  designer_id: string;
+  
+  // 승인 관련
+  designer_approved: boolean;
+  client_approved: boolean;
+  
+  // 메타데이터
+  created_at: string;
+  updated_at: string;
+  last_modified_by: "designer" | "client";
+  
+  // 커뮤니케이션
+  comments: ProjectComment[];
+  notifications: ProjectNotification[];
+}
+
+// 프로젝트 댓글
+export interface ProjectComment {
+  id: string;
+  proposal_id: string;
+  author_id: string;
+  author_type: "designer" | "client";
+  content: string;
+  created_at: string;
+  edited: boolean;
+}
+
+// 프로젝트 알림
+export interface ProjectNotification {
+  id: string;
+  proposal_id: string;
+  recipient_id: string;
+  type: "status_change" | "comment_added" | "approval_request" | "revision_request";
+  title: string;
+  message: string;
+  read: boolean;
+  created_at: string;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -266,6 +361,50 @@ export interface ProjectCost {
   amount: number;
   cost_type: "base_fee" | "modification_fee" | "rush_fee" | "additional_work" | "other";
   created_at: string;
+}
+
+// 수정요청 관리 타입
+export interface ModificationRequest {
+  id: string;
+  project_id: string;
+  request_number: number; // 1, 2, 3...
+  feedback_ids: string[]; // 이 수정요청에 포함된 피드백들
+  status: "pending" | "approved" | "in_progress" | "completed" | "rejected";
+  requested_at: string;
+  approved_at?: string;
+  completed_at?: string;
+  estimated_completion_date?: string;
+  actual_completion_date?: string;
+  description: string; // 수정요청 요약
+  urgency: "normal" | "urgent";
+  requested_by: string; // 요청자 ID
+  approved_by?: string; // 승인자 ID
+  rejection_reason?: string; // 거절 사유
+  is_additional_cost: boolean; // 추가 비용 발생 여부
+  additional_cost_amount?: number; // 추가 비용 금액
+  notes?: string; // 추가 메모
+}
+
+// 수정횟수 현황 타입
+export interface ModificationTracker {
+  project_id: string;
+  total_allowed: number; // 계약된 총 수정횟수
+  used: number; // 사용된 횟수 (완료된 수정요청 수)
+  in_progress: number; // 진행중인 수정요청 수
+  remaining: number; // 남은 횟수
+  requests: ModificationRequest[]; // 모든 수정요청들
+  additional_requests: ModificationRequest[]; // 추가 비용 발생 요청들
+  total_additional_cost: number; // 총 추가 비용
+  last_updated: string;
+}
+
+// 수정요청 생성 폼 데이터
+export interface ModificationRequestFormData {
+  description: string;
+  feedback_ids: string[];
+  urgency: "normal" | "urgent";
+  estimated_completion_date?: string;
+  notes?: string;
 }
 
 // API 응답 타입

@@ -9,9 +9,7 @@ import AuthWrapper from "@/components/auth/AuthWrapper";
 import { Project, Feedback, UserRole } from "@/types";
 import { ProjectWorkflowManager } from "@/lib/projectWorkflow";
 import { FeedbackVersionManager } from "@/lib/feedbackVersionManager";
-import FeedbackForm from "@/components/feedback/FeedbackForm";
-import FeedbackList from "@/components/feedback/FeedbackList";
-import FeedbackVersionHistory from "@/components/feedback/FeedbackVersionHistory";
+import ModificationRequestManager from "@/components/feedback/ModificationRequestManager";
 import FileUpload, { UploadedFile } from "@/components/ui/FileUpload";
 import { addNotification } from "@/lib/notifications";
 
@@ -87,8 +85,6 @@ export default function EnhancedProjectDetailPage() {
   const [activeTab, setActiveTab] = useState<string>(
     searchParams.get("tab") || "overview"
   );
-  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
-  const [editingFeedback, setEditingFeedback] = useState<Feedback | null>(null);
   
   // 파일 업로드 상태
   const [uploadingStage, setUploadingStage] = useState<string | null>(null);
@@ -332,7 +328,6 @@ export default function EnhancedProjectDetailPage() {
 
     setFeedbacks((prev) => [...prev, newFeedback]);
     FeedbackVersionManager.createFeedback(newFeedback);
-    setShowFeedbackForm(false);
 
     addNotification({
       message: "새로운 피드백이 제출되었습니다.",
@@ -341,10 +336,6 @@ export default function EnhancedProjectDetailPage() {
     });
   };
 
-  const handleFeedbackEdit = (feedback: Feedback) => {
-    setEditingFeedback(feedback);
-    setShowFeedbackForm(true);
-  };
 
   const handleFeedbackStatusChange = (
     feedbackId: string,
@@ -630,38 +621,21 @@ export default function EnhancedProjectDetailPage() {
 
       case "feedback":
         return (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">피드백 관리</h3>
-              <button
-                onClick={() => setShowFeedbackForm(true)}
-                className="btn btn-primary"
-              >
-                ✍️ 새 피드백 작성
-              </button>
-            </div>
-
-            {showFeedbackForm && (
-              <FeedbackForm
-                projectId={projectId}
-                reportId="report-1"
-                onSubmit={handleFeedbackSubmit}
-                onCancel={() => {
-                  setShowFeedbackForm(false);
-                  setEditingFeedback(null);
-                }}
-                existingFeedback={editingFeedback || undefined}
-              />
-            )}
-
-            <FeedbackList
-              feedbacks={feedbacks}
-              onEdit={handleFeedbackEdit}
-              onStatusChange={handleFeedbackStatusChange}
-              showActions={true}
-              groupByStatus={true}
-            />
-          </div>
+          <ModificationRequestManager
+            projectId={projectId}
+            reportId="report-1"
+            isDesigner={userRole === "designer"}
+            onModificationRequestSubmit={(data) => {
+              // 수정요청이 제출되었을 때의 처리
+              console.log("New modification request submitted:", data);
+              
+              addNotification({
+                message: "새로운 수정요청이 제출되었습니다.",
+                user_id: user?.id || "",
+                url: `/projects/${projectId}?tab=feedback`,
+              });
+            }}
+          />
         );
 
       case "files":
@@ -1518,7 +1492,7 @@ export default function EnhancedProjectDetailPage() {
               }`}
               onClick={() => setActiveTab("feedback")}
             >
-              💬 피드백 ({feedbacks.length})
+              📋 수정요청 관리 ({feedbacks.length})
             </button>
             <button
               className={`tab tab-lg ${
