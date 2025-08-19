@@ -9,8 +9,8 @@ import AuthWrapper from "@/components/auth/AuthWrapper";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ProjectCardSkeleton } from "@/components/ui/Skeleton";
 
-// 모의 프로젝트 데이터
-const mockProjects: Project[] = [
+// 모의 프로젝트 데이터 (기본값)
+const defaultProjects: Project[] = [
   {
     id: "1",
     name: "로고 디자인 프로젝트",
@@ -151,6 +151,7 @@ export default function ProjectsPage() {
   const searchParams = useSearchParams();
   const initializedRef = useRef(false);
   const [loading, setLoading] = useState(true);
+  const [projects, setProjects] = useState<Project[]>(defaultProjects);
 
   // 검색 및 필터 상태
   const [searchTerm, setSearchTerm] = useState("");
@@ -158,6 +159,22 @@ export default function ProjectsPage() {
   const [designerFilter, setDesignerFilter] = useState("all");
   const [sortBy, setSortBy] = useState("updated_desc");
   const [showArchived, setShowArchived] = useState(false);
+
+  // localStorage에서 프로젝트 불러오기
+  useEffect(() => {
+    const savedProjects = localStorage.getItem('projects');
+    if (savedProjects) {
+      const parsedProjects = JSON.parse(savedProjects);
+      // 기존 기본 프로젝트와 새로 생성된 프로젝트 합치기
+      const combinedProjects = [...parsedProjects, ...defaultProjects];
+      // 중복 제거 (id 기준)
+      const uniqueProjects = combinedProjects.filter((project, index, self) =>
+        index === self.findIndex(p => p.id === project.id)
+      );
+      setProjects(uniqueProjects);
+    }
+    setLoading(false);
+  }, []);
 
   // 1) 쿼리스트링 → 상태 초기화 (최초 1회)
   useEffect(() => {
@@ -200,7 +217,7 @@ export default function ProjectsPage() {
 
   // 필터링 및 정렬된 프로젝트 목록
   const filteredProjects = useMemo(() => {
-    const filtered = mockProjects.filter((project) => {
+    const filtered = projects.filter((project) => {
       // 아카이브 필터
       if (showArchived) {
         return project.status === "archived";
@@ -430,14 +447,14 @@ export default function ProjectsPage() {
             onClick={() => setShowArchived(false)}
           >
             활성 프로젝트 (
-            {mockProjects.filter((p) => p.status !== "archived").length})
+            {projects.filter((p) => p.status !== "archived").length})
           </button>
           <button
             className={`tab ${showArchived ? "tab-active" : ""}`}
             onClick={() => setShowArchived(true)}
           >
             아카이브 (
-            {mockProjects.filter((p) => p.status === "archived").length})
+            {projects.filter((p) => p.status === "archived").length})
           </button>
         </div>
 

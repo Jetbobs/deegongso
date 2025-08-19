@@ -14,15 +14,36 @@ const Sidebar = ({ userRole, isOpen, onClose }: SidebarProps) => {
   const pathname = usePathname();
 
   // 역할별 네비게이션 메뉴
-  const getNavigationItems = (_role: UserRole): NavigationItem[] => {
-    const items: NavigationItem[] = [
+  const getNavigationItems = (role: UserRole): NavigationItem[] => {
+    const baseItems: NavigationItem[] = [
       { label: "대시보드", href: "/dashboard", icon: "🏠" },
       { label: "내 프로젝트", href: "/projects", icon: "📁" },
+    ];
+
+    // 역할별 전용 메뉴
+    if (role === "client") {
+      baseItems.splice(2, 0, { 
+        label: "프로젝트 요청", 
+        href: "/requests", 
+        icon: "📋", 
+        badge: 2 // Mock 데이터 기준 pending 요청 수
+      });
+    } else if (role === "designer") {
+      baseItems.splice(2, 0, { 
+        label: "협상 관리", 
+        href: "/proposals", 
+        icon: "💬", 
+        badge: 1 // Mock 데이터 기준 협상 중 프로젝트 수
+      });
+    }
+
+    baseItems.push(
       // { label: "계약 관리", href: "/contracts", icon: "📋" },
       // { label: "메시지", href: "/messages", icon: "💬", badge: 3 },
-      { label: "설정", href: "/settings", icon: "⚙️" },
-    ];
-    return items;
+      { label: "설정", href: "/settings", icon: "⚙️" }
+    );
+    
+    return baseItems;
   };
 
   const navigationItems = getNavigationItems(userRole);

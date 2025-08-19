@@ -22,6 +22,21 @@ const Header = ({ title, onMenuClick }: HeaderProps) => {
     }
   };
 
+  // 개발용 역할 전환 함수
+  const handleRoleSwitch = () => {
+    const currentRole = user?.role ?? user?.userType ?? "client";
+    const newRole = currentRole === "client" ? "designer" : "client";
+    
+    // localStorage에서 사용자 정보 업데이트
+    const userData = JSON.parse(localStorage.getItem('user') || '{}');
+    userData.role = newRole;
+    userData.userType = newRole;
+    localStorage.setItem('user', JSON.stringify(userData));
+    
+    // 페이지 새로고침하여 변경사항 적용
+    window.location.reload();
+  };
+
   // 사용자 이니셜 생성
   const getUserInitials = () => {
     if (user?.name) {
@@ -68,6 +83,17 @@ const Header = ({ title, onMenuClick }: HeaderProps) => {
 
         {/* 헤더 액션들 */}
         <div className="flex items-center space-x-1 sm:space-x-2">
+          {/* 개발용 역할 전환 버튼 */}
+          {process.env.NODE_ENV === 'development' && (
+            <button
+              className="btn btn-outline btn-sm"
+              onClick={handleRoleSwitch}
+              title="역할 전환 (개발용)"
+            >
+              🔄 {(user?.role ?? user?.userType) === "client" ? "디자이너로" : "클라이언트로"}
+            </button>
+          )}
+
           {/* 모바일 검색 버튼 */}
           <button
             className="btn btn-ghost btn-sm lg:hidden"

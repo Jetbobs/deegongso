@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import AuthWrapper from "@/components/auth/AuthWrapper";
@@ -46,6 +46,7 @@ type WorkflowStep = 1 | 2 | 3 | 4;
 export default function ProjectCreatePage() {
   const router = useRouter();
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const [currentStep, setCurrentStep] = useState<WorkflowStep>(1);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -83,6 +84,68 @@ export default function ProjectCreatePage() {
   );
 
   const userRole: UserRole = user?.role ?? user?.userType ?? "designer";
+
+  // URL 파라미터 처리
+  useEffect(() => {
+    const requestId = searchParams.get("request");
+    const proposalId = searchParams.get("proposal");
+    const step = searchParams.get("step");
+    
+    if (step) {
+      const stepNumber = parseInt(step) as WorkflowStep;
+      if (stepNumber >= 1 && stepNumber <= 4) {
+        setCurrentStep(stepNumber);
+      }
+    }
+    
+    // 클라이언트 요청에서 시작하는 경우
+    if (requestId) {
+      if (requestId === "req-001") {
+        setProjectData(prev => ({
+          ...prev,
+          name: "브랜드 로고 디자인",
+          description: "스타트업을 위한 심플하고 모던한 로고 디자인 작업입니다.",
+          category: "로고 디자인",
+          estimatedPrice: 500000,
+          totalModifications: 3,
+          schedule: {
+            startDate: "2024-01-25",
+            draftDeadline: "2024-02-01", 
+            firstReviewDeadline: "2024-02-05",
+            finalDeadline: "2024-02-10"
+          },
+          clientEmail: "client@example.com"
+        }));
+        
+        setClientModifications(prev => ({
+          ...prev,
+          totalModifications: 3,
+          estimatedPrice: 500000
+        }));
+      }
+    }
+    
+    // 디자이너 의뢰에서 시작하는 경우
+    if (proposalId) {
+      if (proposalId === "proposal-001") {
+        setProjectData(prev => ({
+          ...prev,
+          name: "스타트업 브랜드 아이덴티티 디자인",
+          description: "새로 런칭하는 테크 스타트업의 전체적인 브랜드 아이덴티티를 구축하고 싶습니다. 로고, 컬러 팔레트, 타이포그래피, 명함 등을 포함한 전체적인 브랜딩 작업이 필요합니다.",
+          category: "브랜딩",
+          estimatedPrice: 3000000,
+          totalModifications: 3,
+          schedule: {
+            startDate: "2024-02-01",
+            draftDeadline: "2024-02-15", 
+            firstReviewDeadline: "2024-02-28",
+            finalDeadline: "2024-03-15"
+          },
+          clientEmail: "startup@example.com"
+        }));
+      }
+    }
+  }, [searchParams]);
 
   // 디자이너 전용 접근 가드 (1단계에서만)
   useEffect(() => {
@@ -155,7 +218,7 @@ export default function ProjectCreatePage() {
     setIsLoading(false);
   };
 
-  // 최종 완료
+  // 최종 완료 - 실제 프로젝트 생성
   const completeWorkflow = async () => {
     setIsLoading(true);
     await simulateApiCall();
@@ -172,9 +235,40 @@ export default function ProjectCreatePage() {
       additionalFiles: clientModifications.additionalFiles,
     };
 
-    console.log("최종 프로젝트 데이터:", finalData);
-    alert("프로젝트가 성공적으로 생성되어 진행을 시작합니다!");
-    router.push("/projects");
+    // 실제 프로젝트 생성 (localStorage에 저장)
+    const newProject = {
+      id: Date.now().toString(),
+      name: finalData.name,
+      description: finalData.description,
+      status: "in_progress" as const,
+      client_id: "1",
+      designer_id: "2", 
+      start_date: finalData.schedule.startDate,
+      end_date: finalData.schedule.finalDeadline,
+      draft_deadline: finalData.schedule.draftDeadline,
+      first_review_deadline: finalData.schedule.firstReviewDeadline,
+      final_review_deadline: finalData.schedule.finalDeadline,
+      estimated_price: finalData.estimatedPrice,
+      budget_used: 0,
+      total_modification_count: finalData.totalModifications,
+      remaining_modification_count: finalData.totalModifications,
+      requirements: finalData.description,
+      attached_files: finalData.additionalFiles?.map(f => f.name) || [],
+      contract_file: finalData.contractFile?.name || "",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    // localStorage에서 기존 프로젝트 목록 가져오기
+    const existingProjects = JSON.parse(localStorage.getItem('projects') || '[]');
+    const updatedProjects = [newProject, ...existingProjects];
+    localStorage.setItem('projects', JSON.stringify(updatedProjects));
+
+    console.log("새 프로젝트 생성됨:", newProject);
+    alert("🎉 프로젝트가 성공적으로 생성되어 진행을 시작합니다!");
+    
+    // 생성된 프로젝트 페이지로 이동
+    router.push(`/projects/${newProject.id}`);
     setIsLoading(false);
   };
 
@@ -677,6 +771,91 @@ export default function ProjectCreatePage() {
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* 결제 조건 수정 */}
+      <div className="card bg-base-100 border border-base-300">
+        <div className="card-body">
+          <h3 className="card-title text-lg">결제 조건 수정</h3>
+          
+          <div className="form-control mt-4">
+            <label className="label">
+              <span className="label-text font-medium">결제 방식</span>
+            </label>
+            <select
+              className="select select-bordered w-full"
+              value={projectData.paymentTerms.method}
+              onChange={(e) => updatePaymentTerms({ 
+                method: e.target.value as "lump_sum" | "installment" 
+              })}
+              disabled={!canUserWork()}
+            >
+              <option value="lump_sum">일시불</option>
+              <option value="installment">분할 결제</option>
+            </select>
+          </div>
+
+          {projectData.paymentTerms.method === "installment" && (
+            <div className="space-y-4 mt-4">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    선급금 비율 (%)
+                  </label>
+                  <input
+                    type="number"
+                    className="input input-bordered w-full no-spinner"
+                    placeholder="50"
+                    min="0"
+                    max="100"
+                    disabled={!canUserWork()}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    지불 시점
+                  </label>
+                  <select
+                    className="select select-bordered w-full"
+                    disabled={!canUserWork()}
+                  >
+                    <option>계약 승인 시</option>
+                    <option>프로젝트 시작 시</option>
+                    <option>중간 보고물 제출 시</option>
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    잔금 비율 (%)
+                  </label>
+                  <input
+                    type="number"
+                    className="input input-bordered w-full no-spinner"
+                    placeholder="50"
+                    min="0"
+                    max="100"
+                    disabled={!canUserWork()}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    지불 시점
+                  </label>
+                  <select
+                    className="select select-bordered w-full"
+                    disabled={!canUserWork()}
+                  >
+                    <option>최종 마감일</option>
+                    <option>프로젝트 완료 시</option>
+                    <option>최종 승인 시</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
