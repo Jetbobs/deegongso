@@ -1,11 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import DashboardLayout from '@/components/layout/DashboardLayout';
-import { useAuth } from '@/hooks/useAuth';
-import AuthWrapper from '@/components/auth/AuthWrapper';
-import { UserRole } from '@/types';
+import React, { useState } from 'react';
+
+// 사용자 역할 타입
+type UserRole = 'designer' | 'client';
 
 // 결제 조건 타입
 interface PaymentTerms {
@@ -28,7 +26,6 @@ interface ProjectSchedule {
 interface ProjectData {
   name: string;
   description: string;
-  category: string;
   totalModifications: number;
   estimatedPrice: number;
   schedule: ProjectSchedule;
@@ -36,24 +33,29 @@ interface ProjectData {
   contractFile?: File;
   additionalFiles?: File[];
   additionalDescription?: string;
-  clientEmail: string;
-  clientCompany?: string;
 }
 
 // 워크플로우 단계
 type WorkflowStep = 1 | 2 | 3 | 4;
 
-export default function ProjectCreatePage() {
-  const router = useRouter();
-  const { user } = useAuth();
+// 컴포넌트 props
+interface ProjectCreationFormProps {
+  currentUserRole: UserRole;
+  onComplete?: (data: ProjectData) => void;
+}
+
+const ProjectCreationForm: React.FC<ProjectCreationFormProps> = ({ 
+  currentUserRole, 
+  onComplete 
+}) => {
   const [currentStep, setCurrentStep] = useState<WorkflowStep>(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [userRole] = useState<UserRole>(currentUserRole);
   
   // 프로젝트 데이터 상태
   const [projectData, setProjectData] = useState<ProjectData>({
     name: '',
     description: '',
-    category: '',
     totalModifications: 3,
     estimatedPrice: 0,
     schedule: {
@@ -64,9 +66,7 @@ export default function ProjectCreatePage() {
     },
     paymentTerms: {
       method: 'lump_sum'
-    },
-    clientEmail: '',
-    clientCompany: ''
+    }
   });
 
   // 클라이언트 수정 제안 데이터
@@ -79,16 +79,6 @@ export default function ProjectCreatePage() {
 
   // 디자이너 승인 상태
   const [designerApproval, setDesignerApproval] = useState<boolean | null>(null);
-
-  const userRole: UserRole = user?.role ?? user?.userType ?? 'designer';
-
-  // 디자이너 전용 접근 가드 (1단계에서만)
-  useEffect(() => {
-    if (currentStep === 1 && user && userRole !== 'designer') {
-      alert('프로젝트 생성은 디자이너만 시작할 수 있습니다.');
-      router.replace('/projects');
-    }
-  }, [user, userRole, currentStep, router]);
 
   // 모의 API 호출 함수
   const simulateApiCall = (duration: number = 1500) => {
@@ -126,12 +116,6 @@ export default function ProjectCreatePage() {
   const goToNextStep = async () => {
     setIsLoading(true);
     await simulateApiCall();
-    
-    if (currentStep === 1) {
-      // 1단계에서 2단계로: 클라이언트에게 검토 요청
-      alert('클라이언트에게 검토 요청이 발송되었습니다.');
-    }
-    
     setCurrentStep(prev => (prev + 1) as WorkflowStep);
     setIsLoading(false);
   };
@@ -149,7 +133,6 @@ export default function ProjectCreatePage() {
     await simulateApiCall();
     setCurrentStep(2);
     setDesignerApproval(null);
-    alert('클라이언트에게 재협상 요청이 발송되었습니다.');
     setIsLoading(false);
   };
 
@@ -157,7 +140,6 @@ export default function ProjectCreatePage() {
   const completeWorkflow = async () => {
     setIsLoading(true);
     await simulateApiCall();
-    
     const finalData = {
       ...projectData,
       totalModifications: clientModifications.totalModifications,
@@ -165,10 +147,7 @@ export default function ProjectCreatePage() {
       description: projectData.description + (clientModifications.additionalDescription ? '\n\n' + clientModifications.additionalDescription : ''),
       additionalFiles: clientModifications.additionalFiles
     };
-    
-    console.log('최종 프로젝트 데이터:', finalData);
-    alert('프로젝트가 성공적으로 생성되어 진행을 시작합니다!');
-    router.push('/projects');
+    onComplete?.(finalData);
     setIsLoading(false);
   };
 
@@ -189,16 +168,6 @@ export default function ProjectCreatePage() {
 
   // 진행률 계산
   const progressPercentage = (currentStep / 4) * 100;
-
-  // 현재 단계에서 작업할 수 있는 역할 확인
-  const canUserWork = () => {
-    if (currentStep === 1 || currentStep === 3) {
-      return userRole === 'designer';
-    } else if (currentStep === 2 || currentStep === 4) {
-      return userRole === 'client';
-    }
-    return false;
-  };
 
   // 1단계: 디자이너 초안 제안
   const renderStep1 = () => (
@@ -221,28 +190,7 @@ export default function ProjectCreatePage() {
               value={projectData.name}
               onChange={(e) => updateProjectData('name', e.target.value)}
               placeholder="프로젝트 제목을 입력하세요"
-              disabled={!canUserWork()}
             />
-          </div>
-
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text font-medium">카테고리 *</span>
-            </label>
-            <select
-              className="select select-bordered w-full"
-              value={projectData.category}
-              onChange={(e) => updateProjectData('category', e.target.value)}
-              disabled={!canUserWork()}
-            >
-              <option value="">카테고리를 선택해주세요</option>
-              <option value="logo">🎨 로고 디자인</option>
-              <option value="web">💻 웹 디자인</option>
-              <option value="branding">✨ 브랜딩</option>
-              <option value="app">📱 앱 디자인</option>
-              <option value="print">📄 인쇄물 디자인</option>
-              <option value="other">🔗 기타</option>
-            </select>
           </div>
 
           <div className="form-control">
@@ -254,7 +202,6 @@ export default function ProjectCreatePage() {
               value={projectData.description}
               onChange={(e) => updateProjectData('description', e.target.value)}
               placeholder="프로젝트에 대한 상세한 설명을 작성해주세요"
-              disabled={!canUserWork()}
             />
           </div>
 
@@ -270,7 +217,6 @@ export default function ProjectCreatePage() {
                 onChange={(e) => updateProjectData('totalModifications', parseInt(e.target.value) || 0)}
                 min="1"
                 max="10"
-                disabled={!canUserWork()}
               />
             </div>
 
@@ -284,13 +230,12 @@ export default function ProjectCreatePage() {
                 value={projectData.estimatedPrice}
                 onChange={(e) => updateProjectData('estimatedPrice', parseInt(e.target.value) || 0)}
                 placeholder="0"
-                disabled={!canUserWork()}
               />
             </div>
           </div>
         </div>
 
-        {/* 일정 및 클라이언트 정보 */}
+        {/* 일정 및 결제 */}
         <div className="space-y-4">
           <div className="form-control">
             <label className="label">
@@ -301,7 +246,6 @@ export default function ProjectCreatePage() {
               className="input input-bordered w-full"
               value={projectData.schedule.startDate}
               onChange={(e) => updateProjectData('schedule.startDate', e.target.value)}
-              disabled={!canUserWork()}
             />
           </div>
 
@@ -314,7 +258,6 @@ export default function ProjectCreatePage() {
               className="input input-bordered w-full"
               value={projectData.schedule.draftDeadline}
               onChange={(e) => updateProjectData('schedule.draftDeadline', e.target.value)}
-              disabled={!canUserWork()}
             />
           </div>
 
@@ -327,7 +270,6 @@ export default function ProjectCreatePage() {
               className="input input-bordered w-full"
               value={projectData.schedule.firstReviewDeadline}
               onChange={(e) => updateProjectData('schedule.firstReviewDeadline', e.target.value)}
-              disabled={!canUserWork()}
             />
           </div>
 
@@ -340,35 +282,6 @@ export default function ProjectCreatePage() {
               className="input input-bordered w-full"
               value={projectData.schedule.finalDeadline}
               onChange={(e) => updateProjectData('schedule.finalDeadline', e.target.value)}
-              disabled={!canUserWork()}
-            />
-          </div>
-
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text font-medium">클라이언트 이메일 *</span>
-            </label>
-            <input
-              type="email"
-              className="input input-bordered w-full"
-              value={projectData.clientEmail}
-              onChange={(e) => updateProjectData('clientEmail', e.target.value)}
-              placeholder="client@example.com"
-              disabled={!canUserWork()}
-            />
-          </div>
-
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text font-medium">클라이언트 회사명</span>
-            </label>
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              value={projectData.clientCompany}
-              onChange={(e) => updateProjectData('clientCompany', e.target.value)}
-              placeholder="회사명 (선택사항)"
-              disabled={!canUserWork()}
             />
           </div>
         </div>
@@ -389,7 +302,6 @@ export default function ProjectCreatePage() {
               onChange={(e) => updatePaymentTerms({ 
                 method: e.target.value as 'lump_sum' | 'installment' 
               })}
-              disabled={!canUserWork()}
             >
               <option value="lump_sum">일시불</option>
               <option value="installment">분할 결제</option>
@@ -409,14 +321,13 @@ export default function ProjectCreatePage() {
                     placeholder="50"
                     min="0"
                     max="100"
-                    disabled={!canUserWork()}
                   />
                 </div>
                 <div className="form-control">
                   <label className="label">
                     <span className="label-text">지불 시점</span>
                   </label>
-                  <select className="select select-bordered" disabled={!canUserWork()}>
+                  <select className="select select-bordered">
                     <option>계약 승인 시</option>
                     <option>프로젝트 시작 시</option>
                     <option>중간 보고물 제출 시</option>
@@ -434,14 +345,13 @@ export default function ProjectCreatePage() {
                     placeholder="50"
                     min="0"
                     max="100"
-                    disabled={!canUserWork()}
                   />
                 </div>
                 <div className="form-control">
                   <label className="label">
                     <span className="label-text">지불 시점</span>
                   </label>
-                  <select className="select select-bordered" disabled={!canUserWork()}>
+                  <select className="select select-bordered">
                     <option>최종 마감일</option>
                     <option>프로젝트 완료 시</option>
                     <option>최종 승인 시</option>
@@ -463,7 +373,6 @@ export default function ProjectCreatePage() {
           className="file-input file-input-bordered w-full"
           accept=".pdf,.doc,.docx"
           onChange={(e) => handleFileUpload(e.target.files, 'contractFile')}
-          disabled={!canUserWork()}
         />
         {projectData.contractFile && (
           <div className="text-sm text-base-content/70 mt-1">
@@ -489,7 +398,6 @@ export default function ProjectCreatePage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
             <div className="space-y-2">
               <p><strong>프로젝트명:</strong> {projectData.name}</p>
-              <p><strong>카테고리:</strong> {projectData.category}</p>
               <p><strong>시작일:</strong> {projectData.schedule.startDate}</p>
               <p><strong>최종 마감일:</strong> {projectData.schedule.finalDeadline}</p>
             </div>
@@ -497,7 +405,6 @@ export default function ProjectCreatePage() {
               <p><strong>예상 견적:</strong> {projectData.estimatedPrice.toLocaleString()}원</p>
               <p><strong>총 수정 횟수:</strong> {projectData.totalModifications}회</p>
               <p><strong>결제 방식:</strong> {projectData.paymentTerms.method === 'lump_sum' ? '일시불' : '분할 결제'}</p>
-              <p><strong>클라이언트:</strong> {projectData.clientEmail}</p>
             </div>
           </div>
           <div className="mt-4">
@@ -524,7 +431,6 @@ export default function ProjectCreatePage() {
               }))}
               min="1"
               max="10"
-              disabled={!canUserWork()}
             />
           </div>
 
@@ -541,7 +447,6 @@ export default function ProjectCreatePage() {
                 estimatedPrice: parseInt(e.target.value) || 0
               }))}
               placeholder="0"
-              disabled={!canUserWork()}
             />
           </div>
         </div>
@@ -559,7 +464,6 @@ export default function ProjectCreatePage() {
                 additionalDescription: e.target.value
               }))}
               placeholder="추가적인 요구사항이나 수정하고 싶은 내용을 상세히 작성해주세요"
-              disabled={!canUserWork()}
             />
           </div>
 
@@ -573,13 +477,34 @@ export default function ProjectCreatePage() {
               multiple
               accept="image/*,.pdf,.doc,.docx"
               onChange={(e) => handleFileUpload(e.target.files, 'additionalFiles')}
-              disabled={!canUserWork()}
             />
             {clientModifications.additionalFiles.length > 0 && (
               <div className="text-sm text-base-content/70 mt-1">
                 {clientModifications.additionalFiles.length}개 파일 선택됨
               </div>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* 수정된 결제 조건 */}
+      <div className="card bg-base-100 border border-base-300">
+        <div className="card-body">
+          <h3 className="card-title text-lg">결제 조건 수정</h3>
+          <div className="form-control mt-4">
+            <label className="label">
+              <span className="label-text font-medium">결제 방식</span>
+            </label>
+            <select
+              className="select select-bordered w-full"
+              value={projectData.paymentTerms.method}
+              onChange={(e) => updatePaymentTerms({ 
+                method: e.target.value as 'lump_sum' | 'installment' 
+              })}
+            >
+              <option value="lump_sum">일시불</option>
+              <option value="installment">분할 결제</option>
+            </select>
           </div>
         </div>
       </div>
@@ -652,41 +577,39 @@ export default function ProjectCreatePage() {
       </div>
 
       {/* 승인/거절 선택 */}
-      {canUserWork() && (
-        <div className="card bg-base-100 border border-base-300">
-          <div className="card-body">
-            <h3 className="card-title text-lg">검토 결과</h3>
+      <div className="card bg-base-100 border border-base-300">
+        <div className="card-body">
+          <h3 className="card-title text-lg">검토 결과</h3>
+          
+          <div className="space-y-4 mt-4">
+            <div className="form-control">
+              <label className="label cursor-pointer">
+                <span className="label-text">클라이언트 제안에 동의합니다</span>
+                <input
+                  type="radio"
+                  name="approval"
+                  className="radio radio-primary"
+                  checked={designerApproval === true}
+                  onChange={() => setDesignerApproval(true)}
+                />
+              </label>
+            </div>
             
-            <div className="space-y-4 mt-4">
-              <div className="form-control">
-                <label className="label cursor-pointer">
-                  <span className="label-text">클라이언트 제안에 동의합니다</span>
-                  <input
-                    type="radio"
-                    name="approval"
-                    className="radio radio-primary"
-                    checked={designerApproval === true}
-                    onChange={() => setDesignerApproval(true)}
-                  />
-                </label>
-              </div>
-              
-              <div className="form-control">
-                <label className="label cursor-pointer">
-                  <span className="label-text">수정이 필요하여 재협상을 요청합니다</span>
-                  <input
-                    type="radio"
-                    name="approval"
-                    className="radio radio-secondary"
-                    checked={designerApproval === false}
-                    onChange={() => setDesignerApproval(false)}
-                  />
-                </label>
-              </div>
+            <div className="form-control">
+              <label className="label cursor-pointer">
+                <span className="label-text">수정이 필요하여 재협상을 요청합니다</span>
+                <input
+                  type="radio"
+                  name="approval"
+                  className="radio radio-secondary"
+                  checked={designerApproval === false}
+                  onChange={() => setDesignerApproval(false)}
+                />
+              </label>
             </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 
@@ -708,7 +631,6 @@ export default function ProjectCreatePage() {
               <div className="space-y-2">
                 <h4 className="font-semibold text-base">기본 정보</h4>
                 <p><strong>프로젝트명:</strong> {projectData.name}</p>
-                <p><strong>카테고리:</strong> {projectData.category}</p>
                 <p><strong>시작일:</strong> {projectData.schedule.startDate}</p>
                 <p><strong>최종 마감일:</strong> {projectData.schedule.finalDeadline}</p>
               </div>
@@ -780,8 +702,7 @@ export default function ProjectCreatePage() {
           return userRole === 'designer' && 
                  projectData.name && 
                  projectData.description && 
-                 projectData.estimatedPrice > 0 &&
-                 projectData.clientEmail;
+                 projectData.estimatedPrice > 0;
         case 2:
           return userRole === 'client';
         case 3:
@@ -837,9 +758,9 @@ export default function ProjectCreatePage() {
                       처리중...
                     </>
                   ) : (
-                    currentStep === 1 ? '클라이언트에게 검토 요청' :
-                    currentStep === 2 ? '디자이너에게 수정 제안' :
-                    '클라이언트에게 승인 요청'
+                    currentStep === 1 ? '검토 요청' :
+                    currentStep === 2 ? '수정 제안' :
+                    '승인 요청'
                   )}
                 </button>
               )}
@@ -848,7 +769,7 @@ export default function ProjectCreatePage() {
             <button
               className="btn btn-success"
               onClick={completeWorkflow}
-              disabled={!canUserWork() || isLoading}
+              disabled={isLoading}
             >
               {isLoading ? (
                 <>
@@ -866,103 +787,88 @@ export default function ProjectCreatePage() {
   };
 
   return (
-    <AuthWrapper requireAuth>
-      <DashboardLayout title="새 프로젝트 생성" userRole={userRole}>
-        <div className="min-h-screen bg-base-100 py-8">
-          <div className="container mx-auto px-4 max-w-6xl">
-            {/* 진행률 표시기 */}
-            <div className="mb-8">
-              <div className="text-center mb-4">
-                <h1 className="text-3xl font-bold text-base-content">프로젝트 생성 워크플로우</h1>
-                <p className="text-base-content/70 mt-2">
-                  현재 진행 상황: {currentStep}/4 단계
-                  {!canUserWork() && (
-                    <span className="ml-2 badge badge-warning">
-                      {currentStep === 1 || currentStep === 3 ? '디자이너' : '클라이언트'} 작업 대기중
-                    </span>
-                  )}
-                </p>
+    <div className="min-h-screen bg-base-100 py-8">
+      <div className="container mx-auto px-4 max-w-6xl">
+        {/* 진행률 표시기 */}
+        <div className="mb-8">
+          <div className="text-center mb-4">
+            <h1 className="text-3xl font-bold text-base-content">프로젝트 생성 워크플로우</h1>
+            <p className="text-base-content/70 mt-2">
+              현재 진행 상황: {currentStep}/4 단계 ({userRole === 'designer' ? '디자이너' : '클라이언트'} 모드)
+            </p>
+          </div>
+          
+          <div className="w-full bg-base-200 rounded-full h-3 mb-6">
+            <div 
+              className="bg-primary h-3 rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${progressPercentage}%` }}
+            ></div>
+          </div>
+
+          {/* 단계 표시기 */}
+          <div className="flex justify-between items-center mb-8">
+            {[1, 2, 3, 4].map((step) => (
+              <div
+                key={step}
+                className={`flex flex-col items-center ${
+                  step <= currentStep ? 'text-primary' : 'text-base-content/40'
+                }`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+                    step <= currentStep 
+                      ? 'bg-primary text-primary-content' 
+                      : 'bg-base-300 text-base-content/60'
+                  }`}
+                >
+                  {step}
+                </div>
+                <span className="text-xs mt-1 text-center">
+                  {step === 1 && '초안 제안'}
+                  {step === 2 && '검토 & 수정'}
+                  {step === 3 && '최종 검토'}
+                  {step === 4 && '승인'}
+                </span>
               </div>
-              
-              <div className="w-full bg-base-200 rounded-full h-3 mb-6">
-                <div 
-                  className="bg-primary h-3 rounded-full transition-all duration-500 ease-out"
-                  style={{ width: `${progressPercentage}%` }}
-                ></div>
-              </div>
-
-              {/* 단계 표시기 */}
-              <div className="flex justify-between items-center mb-8">
-                {[1, 2, 3, 4].map((step) => (
-                  <div
-                    key={step}
-                    className={`flex flex-col items-center ${
-                      step <= currentStep ? 'text-primary' : 'text-base-content/40'
-                    }`}
-                  >
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
-                        step <= currentStep 
-                          ? 'bg-primary text-primary-content' 
-                          : 'bg-base-300 text-base-content/60'
-                      }`}
-                    >
-                      {step}
-                    </div>
-                    <span className="text-xs mt-1 text-center">
-                      {step === 1 && '디자이너 초안'}
-                      {step === 2 && '클라이언트 검토'}
-                      {step === 3 && '디자이너 승인'}
-                      {step === 4 && '최종 승인'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 단계별 콘텐츠 */}
-            <div className="card bg-base-100 border border-base-300 shadow-lg">
-              <div className="card-body">
-                {/* 현재 작업 권한이 없는 경우 대기 메시지 */}
-                {!canUserWork() && (
-                  <div className="text-center py-12">
-                    <div className="text-6xl mb-4">⏳</div>
-                    <h3 className="text-xl font-semibold text-base-content mb-2">
-                      {(currentStep === 1 || currentStep === 3) ? '디자이너' : '클라이언트'}의 작업을 기다리고 있습니다
-                    </h3>
-                    <p className="text-base-content/70">
-                      해당 역할의 사용자가 작업을 완료하면 알림을 받게 됩니다.
-                    </p>
-                  </div>
-                )}
-
-                {/* 단계별 폼 */}
-                {canUserWork() && (
-                  <>
-                    {currentStep === 1 && renderStep1()}
-                    {currentStep === 2 && renderStep2()}
-                    {currentStep === 3 && renderStep3()}
-                    {currentStep === 4 && renderStep4()}
-
-                    {/* 네비게이션 버튼 */}
-                    {renderNavigationButtons()}
-                  </>
-                )}
-
-                {/* 읽기 전용 모드에서도 현재 단계 내용 표시 */}
-                {!canUserWork() && (
-                  <div className="opacity-60 pointer-events-none">
-                    {currentStep === 1 && renderStep1()}
-                    {currentStep === 2 && renderStep2()}
-                    {currentStep === 3 && renderStep3()}
-                    {currentStep === 4 && renderStep4()}
-                  </div>
-                )}
-              </div>
-            </div>
+            ))}
           </div>
         </div>
-      </DashboardLayout>
-    </AuthWrapper>
+
+        {/* 단계별 콘텐츠 */}
+        <div className="card bg-base-100 border border-base-300 shadow-lg">
+          <div className="card-body">
+            {/* 역할별 가시성 제어 */}
+            {(currentStep === 1 && userRole === 'designer') && renderStep1()}
+            {(currentStep === 2 && userRole === 'client') && renderStep2()}
+            {(currentStep === 3 && userRole === 'designer') && renderStep3()}
+            {(currentStep === 4 && userRole === 'client') && renderStep4()}
+
+            {/* 잘못된 역할/단계 조합에 대한 대기 메시지 */}
+            {((currentStep === 1 && userRole === 'client') ||
+              (currentStep === 2 && userRole === 'designer') ||
+              (currentStep === 3 && userRole === 'client') ||
+              (currentStep === 4 && userRole === 'designer')) && (
+              <div className="text-center py-12">
+                <div className="text-6xl mb-4">⏳</div>
+                <h3 className="text-xl font-semibold text-base-content mb-2">
+                  {userRole === 'designer' ? '클라이언트' : '디자이너'}의 작업을 기다리고 있습니다
+                </h3>
+                <p className="text-base-content/70">
+                  상대방이 작업을 완료하면 알림을 받게 됩니다.
+                </p>
+              </div>
+            )}
+
+            {/* 네비게이션 버튼 */}
+            {((currentStep === 1 && userRole === 'designer') ||
+              (currentStep === 2 && userRole === 'client') ||
+              (currentStep === 3 && userRole === 'designer') ||
+              (currentStep === 4 && userRole === 'client')) && renderNavigationButtons()}
+          </div>
+        </div>
+      </div>
+    </div>
   );
-}
+};
+
+export default ProjectCreationForm;
