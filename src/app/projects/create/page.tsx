@@ -6,10 +6,11 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import AuthWrapper from "@/components/auth/AuthWrapper";
 import { UserRole } from "@/types";
+import { useProposalStore, seedProposalStore } from "@/stores/proposalStore";
 
 // 결제 조건 타입
 interface PaymentTerms {
-  method: "lump_sum" | "installment";
+  method: "lump_sum" | "installment" | "milestone";
   installments?: {
     percentage: number;
     timing: string;
@@ -20,7 +21,6 @@ interface PaymentTerms {
 interface ProjectSchedule {
   startDate: string;
   draftDeadline: string;
-  firstReviewDeadline: string;
   finalDeadline: string;
 }
 
@@ -49,6 +49,17 @@ export default function ProjectCreatePage() {
   const searchParams = useSearchParams();
   const [currentStep, setCurrentStep] = useState<WorkflowStep>(1);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Zustand 스토어 훅들
+  const { 
+    currentProposal,
+    createNewProposal,
+    updateCurrentProposal,
+    saveCurrentProposal,
+    sendProposal,
+    loadProposal,
+    clearCurrentProposal
+  } = useProposalStore();
 
   // 프로젝트 데이터 상태
   const [projectData, setProjectData] = useState<ProjectData>({
@@ -60,7 +71,6 @@ export default function ProjectCreatePage() {
     schedule: {
       startDate: "",
       draftDeadline: "",
-      firstReviewDeadline: "",
       finalDeadline: "",
     },
     paymentTerms: {
@@ -85,11 +95,15 @@ export default function ProjectCreatePage() {
 
   const userRole: UserRole = user?.role ?? user?.userType ?? "designer";
 
-  // URL 파라미터 처리
+  // 스토어 초기화 및 URL 파라미터 처리
   useEffect(() => {
+    // Mock 데이터 시딩 (개발용)
+    seedProposalStore();
+    
     const requestId = searchParams.get("request");
     const proposalId = searchParams.get("proposal");
     const step = searchParams.get("step");
+    const from = searchParams.get("from");
     
     if (step) {
       const stepNumber = parseInt(step) as WorkflowStep;
@@ -98,7 +112,16 @@ export default function ProjectCreatePage() {
       }
     }
     
-    // 클라이언트 요청에서 시작하는 경우
+    // 기존 제안서 로드
+    if (proposalId && !from) {
+      loadProposal(proposalId);
+    }
+    // 새 제안서 생성 또는 기존 제안서가 없으면 생성
+    else if (!currentProposal && !requestId) {
+      createNewProposal();
+    }
+    
+    // 클라이언트 요청에서 시작하는 경우 (기존 로직 유지)
     if (requestId) {
       if (requestId === "req-001") {
         setProjectData(prev => ({
@@ -124,28 +147,29 @@ export default function ProjectCreatePage() {
         }));
       }
     }
-    
-    // 디자이너 의뢰에서 시작하는 경우
-    if (proposalId) {
-      if (proposalId === "proposal-001") {
-        setProjectData(prev => ({
-          ...prev,
-          name: "스타트업 브랜드 아이덴티티 디자인",
-          description: "새로 런칭하는 테크 스타트업의 전체적인 브랜드 아이덴티티를 구축하고 싶습니다. 로고, 컬러 팔레트, 타이포그래피, 명함 등을 포함한 전체적인 브랜딩 작업이 필요합니다.",
-          category: "브랜딩",
-          estimatedPrice: 3000000,
-          totalModifications: 3,
-          schedule: {
-            startDate: "2024-02-01",
-            draftDeadline: "2024-02-15", 
-            firstReviewDeadline: "2024-02-28",
-            finalDeadline: "2024-03-15"
-          },
-          clientEmail: "startup@example.com"
-        }));
-      }
+  }, [searchParams, currentProposal, createNewProposal, loadProposal]);
+
+  // 스토어의 currentProposal과 projectData 동기화 (초기 로딩 시에만)
+  useEffect(() => {
+    if (currentProposal && !searchParams.get("request") && projectData.name === "") {
+      setProjectData({
+        name: currentProposal.name || "",
+        description: currentProposal.description || "",
+        category: currentProposal.category || "",
+        clientEmail: currentProposal.clientEmail || "",
+        estimatedPrice: currentProposal.estimatedPrice || 0,
+        totalModifications: currentProposal.totalModifications || 3,
+        schedule: currentProposal.schedule || {
+          startDate: "",
+          draftDeadline: "",
+          finalDeadline: ""
+        },
+        paymentTerms: currentProposal.paymentTerms || { method: "lump_sum" },
+        contractFile: currentProposal.contractFile || null,
+        additionalFiles: currentProposal.additionalFiles || []
+      });
     }
-  }, [searchParams]);
+  }, [currentProposal, searchParams]);
 
   // 디자이너 전용 접근 가드 (1단계에서만)
   useEffect(() => {
@@ -160,7 +184,7 @@ export default function ProjectCreatePage() {
     return new Promise((resolve) => setTimeout(resolve, duration));
   };
 
-  // 입력 필드 업데이트 함수
+  // 입력 필드 업데이트 함수 (스토어 연동)
   const updateProjectData = (field: keyof ProjectData | string, value: any) => {
     if (field.includes(".")) {
       const [parent, child] = field.split(".");
@@ -171,11 +195,28 @@ export default function ProjectCreatePage() {
           [child]: value,
         },
       }));
+      
+      // 스토어 업데이트
+      if (currentProposal) {
+        updateCurrentProposal({
+          [parent]: {
+            ...(currentProposal[parent as keyof typeof currentProposal] as any),
+            [child]: value,
+          }
+        });
+        saveCurrentProposal();
+      }
     } else {
       setProjectData((prev) => ({
         ...prev,
         [field]: value,
       }));
+      
+      // 스토어 업데이트
+      if (currentProposal) {
+        updateCurrentProposal({ [field]: value });
+        saveCurrentProposal();
+      }
     }
   };
 
@@ -185,6 +226,12 @@ export default function ProjectCreatePage() {
       ...prev,
       paymentTerms: terms,
     }));
+    
+    // 스토어에도 동일하게 업데이트
+    if (currentProposal) {
+      updateCurrentProposal({ paymentTerms: terms });
+      saveCurrentProposal();
+    }
   };
 
   // 다음 단계로 진행
@@ -194,6 +241,9 @@ export default function ProjectCreatePage() {
 
     if (currentStep === 1) {
       // 1단계에서 2단계로: 클라이언트에게 검토 요청
+      if (currentProposal) {
+        sendProposal(currentProposal.id);
+      }
       alert("클라이언트에게 검토 요청이 발송되었습니다.");
     }
 
@@ -440,25 +490,6 @@ export default function ProjectCreatePage() {
             />
           </div>
 
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text font-medium">
-                중간 보고물 제출일 *
-              </span>
-            </label>
-            <input
-              type="date"
-              className="input input-bordered w-full"
-              value={projectData.schedule.firstReviewDeadline}
-              onChange={(e) =>
-                updateProjectData(
-                  "schedule.firstReviewDeadline",
-                  e.target.value
-                )
-              }
-              disabled={!canUserWork()}
-            />
-          </div>
 
           <div className="form-control">
             <label className="label">
@@ -523,22 +554,25 @@ export default function ProjectCreatePage() {
               value={projectData.paymentTerms.method}
               onChange={(e) =>
                 updatePaymentTerms({
-                  method: e.target.value as "lump_sum" | "installment",
+                  method: e.target.value as "lump_sum" | "installment" | "milestone",
                 })
               }
               disabled={!canUserWork()}
             >
               <option value="lump_sum">일시불</option>
-              <option value="installment">분할 결제</option>
+              <option value="installment">분할 결제 (2회)</option>
+              <option value="milestone">단계별 결제 (3회)</option>
             </select>
           </div>
 
+          {/* 분할 결제 (2회) */}
           {projectData.paymentTerms.method === "installment" && (
-            <div className="space-y-4 mt-4">
-              <div className="space-y-4">
+            <div className="space-y-4 mt-4 p-4 bg-info/5 rounded-lg">
+              <h4 className="font-medium text-base">분할 결제 설정 (2회)</h4>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    선급금 비율 (%)
+                    선급금 (%)
                   </label>
                   <input
                     type="number"
@@ -548,48 +582,150 @@ export default function ProjectCreatePage() {
                     max="100"
                     disabled={!canUserWork()}
                   />
+                  <div className="text-xs text-base-content/60 mt-1">
+                    계약 체결 시
+                  </div>
+                  {projectData.estimatedPrice > 0 && (
+                    <div className="text-xs font-medium text-info mt-1">
+                      ≈ {Math.round(projectData.estimatedPrice * 0.5).toLocaleString()}원
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    지불 시점
+                    잔금 (%)
                   </label>
-                  <select
-                    className="select select-bordered w-full"
+                  <input
+                    type="number"
+                    className="input input-bordered w-full no-spinner"
+                    placeholder="50"
+                    min="0"
+                    max="100"
                     disabled={!canUserWork()}
-                  >
-                    <option>계약 승인 시</option>
-                    <option>프로젝트 시작 시</option>
-                    <option>중간 보고물 제출 시</option>
-                  </select>
+                  />
+                  <div className="text-xs text-base-content/60 mt-1">
+                    최종 완료 시
+                  </div>
+                  {projectData.estimatedPrice > 0 && (
+                    <div className="text-xs font-medium text-info mt-1">
+                      ≈ {Math.round(projectData.estimatedPrice * 0.5).toLocaleString()}원
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="space-y-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-base-content/60">총합:</span>
+                <div className="text-right">
+                  <span className="font-medium">100%</span>
+                  {projectData.estimatedPrice > 0 && (
+                    <div className="text-xs font-medium text-info">
+                      = {projectData.estimatedPrice.toLocaleString()}원
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 단계별 결제 (3회) */}
+          {projectData.paymentTerms.method === "milestone" && (
+            <div className="space-y-4 mt-4 p-4 bg-warning/5 rounded-lg">
+              <h4 className="font-medium text-base">단계별 결제 설정 (3회)</h4>
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    잔금 비율 (%)
+                    선급금 (%)
                   </label>
                   <input
                     type="number"
                     className="input input-bordered w-full no-spinner"
-                    placeholder="50"
+                    placeholder="30"
                     min="0"
                     max="100"
                     disabled={!canUserWork()}
                   />
+                  <div className="text-xs text-base-content/60 mt-1">
+                    계약 체결 시
+                  </div>
+                  {projectData.estimatedPrice > 0 && (
+                    <div className="text-xs font-medium text-warning mt-1">
+                      ≈ {Math.round(projectData.estimatedPrice * 0.3).toLocaleString()}원
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    지불 시점
+                    중도금 (%)
                   </label>
-                  <select
-                    className="select select-bordered w-full"
+                  <input
+                    type="number"
+                    className="input input-bordered w-full no-spinner"
+                    placeholder="40"
+                    min="0"
+                    max="100"
                     disabled={!canUserWork()}
-                  >
-                    <option>최종 마감일</option>
-                    <option>프로젝트 완료 시</option>
-                    <option>최종 승인 시</option>
-                  </select>
+                  />
+                  <div className="text-xs text-base-content/60 mt-1">
+                    초안 완료 시
+                  </div>
+                  {projectData.estimatedPrice > 0 && (
+                    <div className="text-xs font-medium text-warning mt-1">
+                      ≈ {Math.round(projectData.estimatedPrice * 0.4).toLocaleString()}원
+                    </div>
+                  )}
                 </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    잔금 (%)
+                  </label>
+                  <input
+                    type="number"
+                    className="input input-bordered w-full no-spinner"
+                    placeholder="30"
+                    min="0"
+                    max="100"
+                    disabled={!canUserWork()}
+                  />
+                  <div className="text-xs text-base-content/60 mt-1">
+                    최종 완료 시
+                  </div>
+                  {projectData.estimatedPrice > 0 && (
+                    <div className="text-xs font-medium text-warning mt-1">
+                      ≈ {Math.round(projectData.estimatedPrice * 0.3).toLocaleString()}원
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-base-content/60">총합:</span>
+                <div className="text-right">
+                  <span className="font-medium">100%</span>
+                  {projectData.estimatedPrice > 0 && (
+                    <div className="text-xs font-medium text-warning">
+                      = {projectData.estimatedPrice.toLocaleString()}원
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 일시불 안내 */}
+          {projectData.paymentTerms.method === "lump_sum" && (
+            <div className="mt-4 p-4 bg-success/10 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span className="text-success">✓</span>
+                  <span className="text-sm font-medium">프로젝트 완료 후 전액 지급</span>
+                </div>
+                {projectData.estimatedPrice > 0 && (
+                  <span className="text-sm font-bold text-success">
+                    {projectData.estimatedPrice.toLocaleString()}원
+                  </span>
+                )}
+              </div>
+              <div className="text-xs text-base-content/60 mt-1">
+                최종 결과물 납품 완료 시 100% 지급됩니다.
               </div>
             </div>
           )}

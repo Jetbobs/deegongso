@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import AuthWrapper from "@/components/auth/AuthWrapper";
 import DashboardCharts from "@/components/dashboard/DashboardCharts";
+import ProposalsDashboard from "@/components/dashboard/ProposalsDashboard";
 import { useToastActions } from "@/components/ui/Toast";
 import { ProjectNotifications } from "@/lib/pushNotifications";
 import {
@@ -537,6 +538,38 @@ export default function EnhancedDashboardPage() {
                       개
                     </p>
                     <p className="text-sm text-base-content/60">총 프로젝트</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 제안서 관리 (디자이너용) */}
+          {userRole === "designer" && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <ProposalsDashboard userRole={userRole} />
+              <div className="card bg-base-100 shadow-sm">
+                <div className="card-body">
+                  <h3 className="card-title mb-4">빠른 액션</h3>
+                  <div className="space-y-3">
+                    <button 
+                      className="btn btn-primary w-full"
+                      onClick={() => router.push('/projects/create')}
+                    >
+                      📝 새 제안서 작성
+                    </button>
+                    <button 
+                      className="btn btn-secondary w-full"
+                      onClick={() => router.push('/proposals')}
+                    >
+                      💬 협상 관리
+                    </button>
+                    <button 
+                      className="btn btn-accent w-full"
+                      onClick={() => router.push('/projects')}
+                    >
+                      📁 프로젝트 관리
+                    </button>
                   </div>
                 </div>
               </div>
