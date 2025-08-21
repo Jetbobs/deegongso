@@ -94,6 +94,11 @@ const Header = ({ title, onMenuClick }: HeaderProps) => {
             </button>
           )}
 
+          {/* Admin 페이지 링크 */}
+          <Link href="/admin" className="btn btn-error btn-sm">
+            🛠️ Admin
+          </Link>
+
           {/* 모바일 검색 버튼 */}
           <button
             className="btn btn-ghost btn-sm lg:hidden"

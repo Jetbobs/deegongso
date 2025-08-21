@@ -109,6 +109,18 @@ export default function AuthForm({ onNeedsSignup }: AuthFormProps) {
               </div>
               디자이너로 체험하기
             </button>
+
+            <button
+              className="btn btn-ghost btn-sm w-full justify-start"
+              onClick={() => router.push("/admin")}
+            >
+              <div className="avatar placeholder">
+                <div className="bg-error text-error-content rounded-full w-6">
+                  <span className="text-xs">A</span>
+                </div>
+              </div>
+              관리자로 체험하기
+            </button>
           </div>
 
           {/* 커스텀 이메일 테스트 */}
@@ -131,6 +143,13 @@ export default function AuthForm({ onNeedsSignup }: AuthFormProps) {
                 체험
               </button>
             </div>
+          </div>
+
+          {/* 추가 링크들 */}
+          <div className="text-center mt-6 space-y-2">
+            <a href="/auth/forgot-password" className="link link-primary text-sm block">
+              비밀번호를 잊으셨나요?
+            </a>
           </div>
         </div>
       </div>

@@ -9,7 +9,9 @@
       "Bash(npm run dev:*)",
       "Bash(npm run lint)",
       "Bash(npm run build:*)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(mkdir:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits",

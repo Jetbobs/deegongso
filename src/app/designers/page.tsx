@@ -4,7 +4,8 @@ import { useState, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import AuthWrapper from "@/components/auth/AuthWrapper";
-import { UserRole } from "@/types";
+import PublicProfile from "@/components/profile/PublicProfile";
+import { UserRole, User } from "@/types";
 
 // 디자이너 관련 타입 정의
 interface Designer {
@@ -139,6 +140,7 @@ export default function DesignersPage() {
   const [onlineFilter, setOnlineFilter] = useState(false);
   const [verifiedFilter, setVerifiedFilter] = useState(false);
   const [sortBy, setSortBy] = useState("rating_desc");
+  const [selectedDesigner, setSelectedDesigner] = useState<Designer | null>(null);
 
   // 필터링된 디자이너 목록
   const filteredDesigners = useMemo(() => {
@@ -625,8 +627,11 @@ export default function DesignersPage() {
 
                     {/* 액션 버튼 */}
                     <div className="card-actions justify-between">
-                      <button className="btn btn-outline btn-sm">
-                        포트폴리오 보기
+                      <button 
+                        className="btn btn-outline btn-sm"
+                        onClick={() => setSelectedDesigner(designer)}
+                      >
+                        👤 프로필 보기
                       </button>
                       <div className="flex gap-2">
                         <button className="btn btn-ghost btn-sm">
@@ -640,6 +645,32 @@ export default function DesignersPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* 디자이너 프로필 모달 */}
+          {selectedDesigner && (
+            <div className="modal modal-open">
+              <div className="modal-box max-w-7xl w-full h-full max-h-screen overflow-y-auto p-0">
+                <PublicProfile 
+                  designer={{
+                    ...selectedDesigner,
+                    role: "designer" as const,
+                    email: `${selectedDesigner.name.toLowerCase()}@example.com`,
+                    title: selectedDesigner.specialties[0],
+                    bio: selectedDesigner.description,
+                    isVerified: selectedDesigner.isVerified
+                  }}
+                  isOwner={false}
+                />
+                <button 
+                  className="btn btn-ghost btn-circle absolute top-4 right-4 z-10"
+                  onClick={() => setSelectedDesigner(null)}
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="modal-backdrop" onClick={() => setSelectedDesigner(null)}></div>
             </div>
           )}
         </div>

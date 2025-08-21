@@ -7,6 +7,9 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import AuthWrapper from "@/components/auth/AuthWrapper";
 import DashboardCharts from "@/components/dashboard/DashboardCharts";
 import ProposalsDashboard from "@/components/dashboard/ProposalsDashboard";
+import PersonalStats from "@/components/dashboard/PersonalStats";
+import ActivityHistory from "@/components/dashboard/ActivityHistory";
+import PerformanceReports from "@/components/dashboard/PerformanceReports";
 import { useToastActions } from "@/components/ui/Toast";
 import { ProjectNotifications } from "@/lib/pushNotifications";
 import {
@@ -147,6 +150,7 @@ export default function EnhancedDashboardPage() {
     MOCK_UPCOMING_DEADLINES
   );
   const [showCharts, setShowCharts] = useState(false);
+  const [activeTab, setActiveTab] = useState<"overview" | "stats" | "activity" | "reports">("overview");
   const { info } = useToastActions();
 
   const userRole = user?.role ?? user?.userType ?? "client";
@@ -370,8 +374,39 @@ export default function EnhancedDashboardPage() {
             </div>
           </div>
 
-          {/* 최근 활동 & 예정된 마감일 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* 탭 네비게이션 */}
+          <div className="tabs tabs-bordered">
+            <button 
+              className={`tab ${activeTab === "overview" ? "tab-active" : ""}`}
+              onClick={() => setActiveTab("overview")}
+            >
+              📊 개요
+            </button>
+            <button 
+              className={`tab ${activeTab === "stats" ? "tab-active" : ""}`}
+              onClick={() => setActiveTab("stats")}
+            >
+              📈 통계
+            </button>
+            <button 
+              className={`tab ${activeTab === "activity" ? "tab-active" : ""}`}
+              onClick={() => setActiveTab("activity")}
+            >
+              🕐 활동 내역
+            </button>
+            <button 
+              className={`tab ${activeTab === "reports" ? "tab-active" : ""}`}
+              onClick={() => setActiveTab("reports")}
+            >
+              📋 성과 보고서
+            </button>
+          </div>
+
+          {/* 탭 컨텐츠 */}
+          {activeTab === "overview" && (
+            <>
+              {/* 최근 활동 & 예정된 마감일 */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* 최근 활동 */}
             <div className="card bg-base-100 shadow-sm">
               <div className="card-body">
@@ -576,46 +611,63 @@ export default function EnhancedDashboardPage() {
             </div>
           )}
 
-          {/* 차트 섹션 */}
-          {showCharts && <DashboardCharts userRole={userRole} />}
+              {/* 차트 섹션 */}
+              {showCharts && <DashboardCharts userRole={userRole} />}
+              
+              {/* 빠른 액션 */}
+              <div className="card bg-base-100 shadow-sm">
+                <div className="card-body">
+                  <h3 className="text-lg font-semibold mb-4">빠른 작업</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <button
+                      onClick={() => handleQuickAction("new_project")}
+                      className="btn btn-outline btn-lg"
+                    >
+                      새 프로젝트
+                    </button>
 
-          {/* 빠른 액션 */}
-          <div className="card bg-base-100 shadow-sm">
-            <div className="card-body">
-              <h3 className="text-lg font-semibold mb-4">빠른 작업</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <button
-                  onClick={() => handleQuickAction("new_project")}
-                  className="btn btn-outline btn-lg"
-                >
-                  새 프로젝트
-                </button>
+                    <button
+                      onClick={() => handleQuickAction("view_messages")}
+                      className="btn btn-outline btn-lg"
+                    >
+                      메시지 확인
+                    </button>
 
-                <button
-                  onClick={() => handleQuickAction("view_messages")}
-                  className="btn btn-outline btn-lg"
-                >
-                  메시지 확인
-                </button>
+                    {userRole === "client" && (
+                      <button
+                        onClick={() => handleQuickAction("find_designers")}
+                        className="btn btn-outline btn-lg"
+                      >
+                        디자이너 찾기
+                      </button>
+                    )}
 
-                {userRole === "client" && (
-                  <button
-                    onClick={() => handleQuickAction("find_designers")}
-                    className="btn btn-outline btn-lg"
-                  >
-                    디자이너 찾기
-                  </button>
-                )}
-
-                <button
-                  onClick={() => handleQuickAction("settings")}
-                  className="btn btn-outline btn-lg"
-                >
-                  설정
-                </button>
+                    <button
+                      onClick={() => handleQuickAction("settings")}
+                      className="btn btn-outline btn-lg"
+                    >
+                      설정
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            </>
+          )}
+
+          {/* 통계 탭 */}
+          {activeTab === "stats" && (
+            <PersonalStats userRole={userRole} />
+          )}
+
+          {/* 활동 내역 탭 */}
+          {activeTab === "activity" && (
+            <ActivityHistory />
+          )}
+
+          {/* 성과 보고서 탭 */}
+          {activeTab === "reports" && (
+            <PerformanceReports userRole={userRole} />
+          )}
         </div>
       </DashboardLayout>
     </AuthWrapper>

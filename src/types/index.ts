@@ -1,5 +1,5 @@
 // 사용자 관련 타입
-export type UserRole = "client" | "designer";
+export type UserRole = "client" | "designer" | "admin";
 
 // 기본 사용자 정보
 export interface BaseUser {
@@ -30,8 +30,15 @@ export interface DesignerUser extends BaseUser {
   strengths?: string[]; // 강점
 }
 
+// 어드민 사용자 정보
+export interface AdminUser extends BaseUser {
+  role: "admin";
+  admin_level: "super" | "moderator" | "support";
+  permissions: AdminPermissions;
+}
+
 // 유니온 타입
-export type User = ClientUser | DesignerUser;
+export type User = ClientUser | DesignerUser | AdminUser;
 
 // 임시 사용자 타입 (회원가입 플로우용)
 export interface TempUser {
@@ -431,4 +438,131 @@ export interface NavigationItem {
   icon?: string;
   badge?: number;
   isActive?: boolean;
+}
+
+// Admin 관련 타입들
+export interface AdminPermissions {
+  user_management: boolean;
+  dispute_resolution: boolean;
+  payment_management: boolean;
+  platform_settings: boolean;
+  analytics_access: boolean;
+  content_moderation: boolean;
+  announcement_management: boolean;
+}
+
+// 분쟁 관리 타입
+export interface Dispute {
+  id: string;
+  project_id: string;
+  reporter_id: string;
+  reported_id: string;
+  dispute_type: "payment" | "quality" | "deadline" | "communication" | "other";
+  status: "open" | "investigating" | "resolved" | "closed";
+  priority: "low" | "medium" | "high" | "urgent";
+  description: string;
+  evidence_files: string[];
+  admin_notes?: string;
+  resolution?: string;
+  assigned_admin_id?: string;
+  created_at: string;
+  resolved_at?: string;
+}
+
+// 사용자 제재 타입
+export interface UserSanction {
+  id: string;
+  user_id: string;
+  sanction_type: "warning" | "suspension" | "ban" | "restriction";
+  reason: string;
+  start_date: string;
+  end_date?: string;
+  is_active: boolean;
+  issued_by: string;
+  notes?: string;
+}
+
+// Admin 대시보드 통계 타입
+export interface AdminStats {
+  total_users: number;
+  total_projects: number;
+  active_disputes: number;
+  monthly_revenue: number;
+  user_growth_rate: number;
+  project_completion_rate: number;
+  recent_activities: AdminActivity[];
+}
+
+export interface AdminActivity {
+  id: string;
+  type: "user_registered" | "project_created" | "dispute_opened" | "payment_completed";
+  description: string;
+  timestamp: string;
+  user_id?: string;
+  project_id?: string;
+}
+
+// 플랫폼 설정 타입
+export interface PlatformSetting {
+  id: string;
+  setting_key: string;
+  setting_value: any;
+  description: string;
+  updated_by: string;
+  updated_at: string;
+}
+
+// 공지사항 관리 타입
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  content_html: string;
+  status: "draft" | "published" | "scheduled" | "deleted";
+  priority: "normal" | "important" | "urgent";
+  target_audience: "all" | "client" | "designer";
+  
+  // 발송 관련
+  publish_at?: string; // 예약 발송일
+  expires_at?: string; // 만료일
+  
+  // 통계
+  total_recipients: number;
+  read_count: number;
+  read_rate: number;
+  
+  // 메타데이터
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  published_at?: string;
+  
+  // 추가 옵션
+  is_pinned: boolean; // 상단 고정
+  allow_comments: boolean; // 댓글 허용
+  send_push: boolean; // 푸시 알림 발송
+  send_email: boolean; // 이메일 발송
+}
+
+// 공지사항 읽음 상태
+export interface AnnouncementReadStatus {
+  id: string;
+  announcement_id: string;
+  user_id: string;
+  read_at: string;
+  user_role: UserRole;
+}
+
+// 공지사항 작성/수정 폼 데이터
+export interface AnnouncementFormData {
+  title: string;
+  content: string;
+  priority: "normal" | "important" | "urgent";
+  target_audience: "all" | "client" | "designer";
+  publish_at?: string;
+  expires_at?: string;
+  is_pinned: boolean;
+  allow_comments: boolean;
+  send_push: boolean;
+  send_email: boolean;
 }
