@@ -21,10 +21,19 @@ export default function NotificationsDropdown({ userId }: Props) {
     let mounted = true;
     (async () => {
       setLoading(true);
-      const data = await fetchNotifications(userId);
-      if (mounted) {
-        setItems(data);
-        setLoading(false);
+      try {
+        // 모든 알림을 가져오도록 수정 (userId 관계없이)
+        const data = await fetchNotifications();
+        if (mounted) {
+          setItems(data);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('알림 로드 실패:', error);
+        if (mounted) {
+          setItems([]);
+          setLoading(false);
+        }
       }
     })();
     return () => {
@@ -81,7 +90,7 @@ export default function NotificationsDropdown({ userId }: Props) {
       </div>
       <div
         tabIndex={0}
-        className="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-80"
+        className="dropdown-content z-[1000] menu p-2 shadow bg-base-100 rounded-box w-80"
       >
         <div className="px-2 py-1 flex items-center justify-between">
           <span className="text-sm font-semibold">알림</span>
@@ -107,15 +116,15 @@ export default function NotificationsDropdown({ userId }: Props) {
           <ul className="max-h-80 overflow-auto">
             {unread.map((n) => (
               <li key={n.id}>
-                <button
-                  className="w-full text-left p-3 hover:bg-base-200 rounded"
+                <a
+                  className="block p-3 hover:bg-base-200 rounded cursor-pointer"
                   onClick={() => handleClick(n)}
                 >
                   <div className="text-sm">{n.message}</div>
                   <div className="text-xs text-base-content/60 mt-1">
                     {new Date(n.created_at).toLocaleString()}
                   </div>
-                </button>
+                </a>
               </li>
             ))}
           </ul>

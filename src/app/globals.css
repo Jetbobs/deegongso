@@ -502,3 +502,23 @@ svg *:focus-visible {
     background: white;
   }
 }
+
+/* DaisyUI 드롭다운 z-index 수정 */
+.dropdown .dropdown-content {
+  z-index: 1000 !important;
+}
+
+/* 관리자 전용 스타일 */
+.admin-header {
+  background: linear-gradient(135deg, #dc2626 0%, #7c2d12 100%);
+}
+
+.admin-sidebar {
+  background: linear-gradient(180deg, #dc2626 0%, #7c2d12 100%);
+}
+
+/* 관리자 프로필 아바타 스타일 */
+.admin-avatar {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  color: white;
+}
