@@ -35,6 +35,12 @@ export default function AdminSidebar() {
       permission: "announcement_management",
     },
     {
+      label: "마크업 관리",
+      href: "/admin/markups",
+      icon: "🎯",
+      permission: "project_management",
+    },
+    {
       label: "분쟁 해결",
       href: "/admin/disputes",
       icon: "⚖️",

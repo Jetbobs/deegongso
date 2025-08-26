@@ -120,6 +120,7 @@ export interface ProjectProposal {
     service_scope: string; // 서비스 범위
     estimated_price: number;
     total_modification_count: number;
+    additional_modification_fee: number; // 추가 수정 건당 요금
     suggested_timeline: {
       total_duration: number; // 총 소요기간 (일)
       draft_deadline: string;
@@ -210,6 +211,8 @@ export interface Project {
   estimated_price: number;
   total_modification_count: number;
   remaining_modification_count: number;
+  additional_modification_fee: number; // 추가 수정 건당 요금
+  modification_history: ModificationRecord[]; // 수정 이력
 
   // 예산 관련
   budget_used: number; // 사용된 예산 (실제 작업 시간 * 시간당 요금 등)
@@ -392,6 +395,20 @@ export interface ModificationRequest {
   notes?: string; // 추가 메모
 }
 
+// 수정 기록 타입
+export interface ModificationRecord {
+  id: string;
+  project_id: string;
+  modification_number: number; // 1, 2, 3...
+  description: string;
+  is_additional: boolean; // 추가 수정 여부
+  additional_fee?: number; // 추가 수정 시 부과된 요금
+  requested_at: string;
+  completed_at?: string;
+  requested_by: string; // 요청자 ID
+  approved_by?: string; // 승인자 ID
+}
+
 // 수정횟수 현황 타입
 export interface ModificationTracker {
   project_id: string;
@@ -412,6 +429,130 @@ export interface ModificationRequestFormData {
   urgency: "normal" | "urgent";
   estimated_completion_date?: string;
   notes?: string;
+}
+
+// 시안 버전 관리 타입
+export interface DesignVersion {
+  id: string;
+  project_id: string;
+  version_number: number; // v1, v2, v3...
+  title?: string; // 사용자 정의 제목
+  description?: string; // 버전 설명
+  files: DesignFile[]; // 시안 파일들
+  thumbnail_url?: string; // 썸네일 이미지
+  created_by: string; // 업로더 ID (디자이너)
+  created_at: string;
+  is_current: boolean; // 현재 작업 중인 버전
+  is_approved: boolean; // 클라이언트 승인 여부
+  approved_at?: string;
+  approved_by?: string; // 승인자 ID
+}
+
+export interface DesignFile {
+  id: string;
+  version_id: string;
+  filename: string;
+  original_filename: string;
+  file_type: string; // 'image/jpeg', 'image/png', 'application/x-psd' 등
+  file_size: number;
+  file_url: string;
+  thumbnail_url?: string;
+  width?: number;
+  height?: number;
+  is_primary: boolean; // 대표 이미지 여부
+  uploaded_at: string;
+}
+
+export interface VersionComparison {
+  version_a: DesignVersion;
+  version_b: DesignVersion;
+  comparison_mode: 'side-by-side' | 'overlay' | 'slider';
+}
+
+// 마크업 시스템 타입
+export interface ImageMarkup {
+  id: string;
+  version_id: string;
+  x: number; // 백분율 (0-100)
+  y: number; // 백분율 (0-100)
+  type: MarkupType;
+  number: number; // 마크업 순서 번호
+  feedback_id?: string; // 연결된 피드백 ID
+  created_at: string;
+  created_by: string;
+  color?: string; // 마크업 색상
+  size?: number; // 마크업 크기
+}
+
+export type MarkupType = 'point' | 'circle' | 'arrow' | 'rectangle' | 'text' | 'freehand';
+
+export interface MarkupFeedback {
+  id: string;
+  markup_id: string;
+  version_id: string;
+  project_id: string;
+  title: string;
+  description: string;
+  additionalText?: string;
+  referenceUrls?: string[]; // 레퍼런스 URL 목록
+  referenceFiles?: FeedbackFile[]; // 첨부 파일 목록
+  category: FeedbackCategory;
+  priority: 'low' | 'medium' | 'high';
+  status: 'pending' | 'in_progress' | 'resolved' | 'rejected';
+  suggested_changes?: SuggestedChange[];
+  created_at: string;
+  created_by: string;
+  resolved_at?: string;
+  resolved_by?: string;
+}
+
+export interface FeedbackFile {
+  id: string;
+  filename: string;
+  originalName: string;
+  fileSize: number;
+  fileType: string;
+  fileUrl: string;
+  uploadedAt: string;
+}
+
+export interface ChecklistItem {
+  id: string;
+  content: string;
+  description?: string; // 상세 설명
+  referenceUrls?: string[]; // 레퍼런스 URL 목록
+  referenceFiles?: FeedbackFile[]; // 첨부 파일 목록
+  isCompleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+  priority: 'low' | 'medium' | 'high';
+  type: 'markup' | 'general'; // 마크업 피드백에서 자동 생성 vs 직접 추가
+  markupFeedbackId?: string; // 마크업 피드백과 연결된 경우
+}
+
+export type FeedbackCategory = 
+  | 'color' 
+  | 'typography' 
+  | 'layout' 
+  | 'content' 
+  | 'size' 
+  | 'positioning' 
+  | 'style' 
+  | 'general';
+
+export interface SuggestedChange {
+  property: string; // 'color', 'fontSize', 'position' 등
+  current_value?: string;
+  suggested_value: string;
+  description?: string;
+}
+
+export interface MarkupTool {
+  type: MarkupType;
+  icon: string;
+  label: string;
+  description: string;
+  color: string;
 }
 
 // API 응답 타입

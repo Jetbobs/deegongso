@@ -220,7 +220,8 @@ export default function ModificationTracker({
           </p>
         </div>
         
-        {showActions && tracker.remaining > 0 && onRequestModification && (
+        {/* 수정 요청하기 버튼 숨김 처리 */}
+        {false && showActions && tracker.remaining > 0 && onRequestModification && (
           <button
             onClick={onRequestModification}
             className="btn btn-primary btn-sm"

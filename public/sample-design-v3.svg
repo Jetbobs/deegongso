@@ -1,0 +1,25 @@
+<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100%" height="100%" fill="#f8fafc"/>
+  
+  <!-- 로고 디자인 예시 v3 -->
+  <g transform="translate(300, 180)">
+    <!-- 그라데이션 정의 -->
+    <defs>
+      <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#7C3AED;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#A855F7;stop-opacity:1" />
+      </linearGradient>
+    </defs>
+    
+    <!-- 복합 도형 배경 -->
+    <polygon points="50,50 150,50 200,100 150,150 50,150 0,100" fill="url(#logoGradient)" stroke="#6D28D9" stroke-width="3"/>
+    
+    <!-- 로고 텍스트 -->
+    <text x="100" y="95" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="white" text-anchor="middle">FINAL</text>
+    <text x="100" y="120" font-family="Arial, sans-serif" font-size="12" fill="white" text-anchor="middle">DESIGN v3</text>
+  </g>
+  
+  <!-- 설명 텍스트 -->
+  <text x="400" y="420" font-family="Arial, sans-serif" font-size="20" fill="#374151" text-anchor="middle">최종 수정안 v3</text>
+  <text x="400" y="450" font-family="Arial, sans-serif" font-size="14" fill="#6b7280" text-anchor="middle">최종 검토 완료 - 브랜드 가이드라인 적용</text>
+</svg>

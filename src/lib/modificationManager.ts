@@ -103,7 +103,7 @@ export class ModificationManager {
   }
 
   /**
-   * 수정요청을 완료합니다
+   * 수정요청을 완료합니다 - 자동으로 수정 횟수 차감
    */
   static completeModificationRequest(
     requestId: string,
@@ -122,6 +122,10 @@ export class ModificationManager {
     };
 
     this.saveModificationRequest(updatedRequest);
+    
+    // 자동으로 프로젝트 수정 횟수 업데이트
+    this.updateProjectModificationCount(request.project_id, updatedRequest);
+    
     return updatedRequest;
   }
 
@@ -204,13 +208,102 @@ export class ModificationManager {
       return { isAdditionalCost: false };
     }
 
-    // 기본 추가 수정 비용 (실제로는 프로젝트 설정에서 가져와야 함)
-    const baseAdditionalCost = 100000; // 10만원
+    // 프로젝트에서 설정된 추가 수정 요금 가져오기
+    const project = this.getProjectInfo(projectId);
+    const baseAdditionalCost = project?.additional_modification_fee || 50000; // 기본 5만원
     const urgentMultiplier = urgency === "urgent" ? 1.5 : 1;
     
     return {
       isAdditionalCost: true,
-      amount: baseAdditionalCost * urgentMultiplier
+      amount: Math.round(baseAdditionalCost * urgentMultiplier)
+    };
+  }
+
+  /**
+   * 프로젝트의 수정 횟수를 자동으로 업데이트합니다
+   */
+  static updateProjectModificationCount(
+    projectId: string, 
+    completedRequest: ModificationRequest
+  ): void {
+    const project = this.getProject(projectId);
+    if (!project) return;
+
+    // 수정 이력에 추가
+    const modificationRecord = {
+      id: this.generateId(),
+      project_id: projectId,
+      modification_number: project.modification_history?.length + 1 || 1,
+      description: completedRequest.description,
+      is_additional: completedRequest.is_additional_cost,
+      additional_fee: completedRequest.additional_cost_amount,
+      requested_at: completedRequest.requested_at,
+      completed_at: completedRequest.completed_at!,
+      requested_by: completedRequest.requested_by,
+      approved_by: completedRequest.approved_by
+    };
+
+    // 프로젝트 정보 업데이트
+    const updatedProject = {
+      ...project,
+      remaining_modification_count: completedRequest.is_additional_cost 
+        ? project.remaining_modification_count 
+        : Math.max(0, project.remaining_modification_count - 1),
+      modification_history: [...(project.modification_history || []), modificationRecord],
+      updated_at: new Date().toISOString()
+    };
+
+    this.saveProject(updatedProject);
+    
+    // 수정 횟수 소진 시 알림
+    if (updatedProject.remaining_modification_count === 0 && !completedRequest.is_additional_cost) {
+      this.createModificationLimitNotification(projectId, completedRequest.requested_by);
+    }
+  }
+
+  /**
+   * 수정 횟수 소진 알림을 생성합니다
+   */
+  static createModificationLimitNotification(projectId: string, userId: string): void {
+    this.sendNotification({
+      user_id: userId,
+      message: "⚠️ 계약된 수정 횟수를 모두 사용했습니다. 추가 수정은 별도 요금이 발생합니다.",
+      url: `/projects/${projectId}`,
+      created_at: new Date().toISOString(),
+      priority: "high"
+    });
+  }
+
+  /**
+   * 수정 횟수 현황을 실시간으로 계산합니다
+   */
+  static getModificationCountStatus(projectId: string) {
+    const tracker = this.getModificationTracker(projectId);
+    const project = this.getProject(projectId);
+    
+    const status = {
+      total_allowed: tracker.total_allowed,
+      used: tracker.used,
+      in_progress: tracker.in_progress,
+      remaining: tracker.remaining,
+      additional_used: tracker.additional_requests.filter(r => r.status === "completed").length,
+      total_additional_cost: tracker.total_additional_cost,
+      is_limit_exceeded: tracker.remaining === 0,
+      next_modification_cost: project?.additional_modification_fee || 50000,
+      warning_threshold: Math.ceil(tracker.total_allowed * 0.8) // 80% 사용 시 경고
+    };
+
+    return {
+      ...status,
+      should_warn: tracker.used >= status.warning_threshold && !status.is_limit_exceeded,
+      status_color: status.is_limit_exceeded ? 'error' : 
+                   status.should_warn ? 'warning' : 
+                   tracker.used > 0 ? 'info' : 'success',
+      status_message: status.is_limit_exceeded 
+        ? `계약 범위를 초과했습니다. 추가 수정은 ${this.formatCurrency(status.next_modification_cost)}이 부과됩니다.`
+        : status.should_warn 
+        ? `${status.remaining}회 남았습니다. 신중하게 사용해주세요.`
+        : `${status.remaining}회 수정이 가능합니다.`
     };
   }
 
@@ -286,7 +379,11 @@ export class ModificationManager {
   private static getProject(projectId: string): any {
     // 실제 구현에서는 API 호출 또는 데이터베이스 조회
     const stored = localStorage.getItem(`project_${projectId}`);
-    return stored ? JSON.parse(stored) : { total_modification_count: 3 };
+    return stored ? JSON.parse(stored) : { total_modification_count: 3, additional_modification_fee: 50000 };
+  }
+
+  private static getProjectInfo(projectId: string): any {
+    return this.getProject(projectId);
   }
 
   private static getProjectFeedbacks(projectId: string): Feedback[] {
@@ -295,9 +392,22 @@ export class ModificationManager {
     return stored ? JSON.parse(stored) : [];
   }
 
+  private static saveProject(project: any): void {
+    // 실제 구현에서는 API 호출 또는 데이터베이스 저장
+    localStorage.setItem(`project_${project.id}`, JSON.stringify(project));
+  }
+
   private static sendNotification(notification: any): void {
     // 실제 알림 시스템 연동
     console.log("Sending notification:", notification);
+  }
+
+  private static formatCurrency(amount: number): string {
+    return new Intl.NumberFormat('ko-KR', {
+      style: 'currency',
+      currency: 'KRW',
+      minimumFractionDigits: 0
+    }).format(amount);
   }
 }
 

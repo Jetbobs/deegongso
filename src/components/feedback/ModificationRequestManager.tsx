@@ -107,7 +107,8 @@ export default function ModificationRequestManager({
         </div>
 
         <div className="flex items-center space-x-2">
-          {!isDesigner && modificationTracker.remaining > 0 && (
+          {/* 수정요청 버튼 숨김 처리 */}
+          {false && !isDesigner && modificationTracker.remaining > 0 && (
             <button
               onClick={() => setShowModificationForm(true)}
               className="btn btn-primary btn-sm"
@@ -163,7 +164,8 @@ export default function ModificationRequestManager({
               <p className="text-base-content/60 mb-4">
                 첫 번째 수정요청을 만들어보세요!
               </p>
-              {!isDesigner && (
+              {/* 첫 수정요청 버튼 숨김 처리 */}
+              {false && !isDesigner && (
                 <button
                   onClick={() => setShowModificationForm(true)}
                   className="btn btn-primary"

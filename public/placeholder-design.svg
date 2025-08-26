@@ -1,0 +1,15 @@
+<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100%" height="100%" fill="#f3f4f6"/>
+  <rect x="100" y="100" width="600" height="400" fill="#e5e7eb" stroke="#d1d5db" stroke-width="2" stroke-dasharray="10,5"/>
+  
+  <!-- 이미지 아이콘 -->
+  <g transform="translate(350, 250)">
+    <rect x="0" y="0" width="100" height="80" fill="#9ca3af" rx="8"/>
+    <circle cx="25" cy="25" r="8" fill="#6b7280"/>
+    <path d="M15 50 L35 35 L55 45 L85 25 L85 70 L15 70 Z" fill="#6b7280"/>
+  </g>
+  
+  <!-- 텍스트 -->
+  <text x="400" y="370" font-family="Arial, sans-serif" font-size="24" fill="#6b7280" text-anchor="middle">시안 미리보기</text>
+  <text x="400" y="400" font-family="Arial, sans-serif" font-size="16" fill="#9ca3af" text-anchor="middle">이미지를 업로드하여 마크업 작업을 시작하세요</text>
+</svg>

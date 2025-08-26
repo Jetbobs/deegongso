@@ -57,7 +57,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* 통계 카드 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <div className="bg-white p-6 rounded-lg shadow border">
           <div className="flex items-center justify-between">
             <div>
@@ -118,6 +118,21 @@ export default function AdminDashboard() {
           <div className="mt-4">
             <span className="text-sm text-green-600">+23.1%</span>
             <span className="text-sm text-gray-500 ml-1">전월 대비</span>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-lg shadow border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">마크업 피드백</p>
+              <p className="text-2xl font-bold text-purple-600">127</p>
+            </div>
+            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+              <span className="text-2xl">🎯</span>
+            </div>
+          </div>
+          <div className="mt-4">
+            <span className="text-sm text-orange-600">23개 미해결</span>
           </div>
         </div>
       </div>

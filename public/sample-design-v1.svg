@@ -1,0 +1,17 @@
+<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100%" height="100%" fill="#f8fafc"/>
+  
+  <!-- 로고 디자인 예시 -->
+  <g transform="translate(300, 200)">
+    <!-- 원형 배경 -->
+    <circle cx="100" cy="100" r="80" fill="#4F46E5" stroke="#3730A3" stroke-width="3"/>
+    
+    <!-- 로고 텍스트 -->
+    <text x="100" y="90" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="white" text-anchor="middle">LOGO</text>
+    <text x="100" y="120" font-family="Arial, sans-serif" font-size="16" fill="white" text-anchor="middle">DESIGN v1</text>
+  </g>
+  
+  <!-- 설명 텍스트 -->
+  <text x="400" y="420" font-family="Arial, sans-serif" font-size="20" fill="#374151" text-anchor="middle">로고 디자인 초안 v1</text>
+  <text x="400" y="450" font-family="Arial, sans-serif" font-size="14" fill="#6b7280" text-anchor="middle">모던하고 미니멀한 디자인 컨셉</text>
+</svg>

@@ -522,3 +522,13 @@ svg *:focus-visible {
   background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
   color: white;
 }
+
+/* 스크롤바 숨김 유틸리티 클래스 */
+.scrollbar-hide {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}

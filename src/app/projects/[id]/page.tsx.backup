@@ -10,7 +10,7 @@ import { Project, Feedback, UserRole } from "@/types";
 import { ProjectWorkflowManager } from "@/lib/projectWorkflow";
 import { FeedbackVersionManager } from "@/lib/feedbackVersionManager";
 import ModificationRequestManager from "@/components/feedback/ModificationRequestManager";
-
+import FeedbackVersionHistory from "@/components/feedback/FeedbackVersionHistory";
 import FileUpload, { UploadedFile } from "@/components/ui/FileUpload";
 import { addNotification } from "@/lib/notifications";
 import VersionManagerComponent from "@/components/versions/VersionManager";
@@ -695,7 +695,6 @@ export default function EnhancedProjectDetailPage() {
                 projectId={projectId}
                 userRole={userRole}
                 currentUserId={user?.id || "current-user"}
-                generalFeedbacks={feedbacks}
                 onFeedbackCreate={(feedback) => {
                   addNotification({
                     message: `새로운 피드백 '${feedback.title}'이 등록되었습니다.`,
@@ -1580,10 +1579,13 @@ export default function EnhancedProjectDetailPage() {
             )}
 
             {activeTab.startsWith("history-") ? (
-              <div className="text-center py-12">
-                <div className="text-4xl mb-4">📚</div>
-                <p className="text-base-content/60">피드백 히스토리를 준비 중입니다.</p>
-              </div>
+              <FeedbackVersionHistory
+                feedbackId={activeTab.replace("history-", "")}
+                onVersionRestore={(version) => {
+                  console.log(`버전 ${version}으로 복원`);
+                }}
+                showActions={true}
+              />
             ) : (
               <div className="text-center py-12">
                 <div className="text-6xl mb-4">📜</div>

@@ -22,10 +22,13 @@
     "@tiptap/react": "^3.1.0",
     "@tiptap/starter-kit": "^3.1.0",
     "daisyui": "^5.0.46",
+    "konva": "^9.3.22",
     "next": "15.4.2",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "react-konva": "^19.0.7",
     "recharts": "^3.1.2",
+    "use-image": "^1.1.4",
     "zustand": "^5.0.7"
   },
   "devDependencies": {

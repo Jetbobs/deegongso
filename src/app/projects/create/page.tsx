@@ -30,6 +30,7 @@ interface ProjectData {
   description: string;
   category: string;
   totalModifications: number;
+  additionalModificationFee: number;
   estimatedPrice: number;
   schedule: ProjectSchedule;
   paymentTerms: PaymentTerms;
@@ -67,6 +68,7 @@ export default function ProjectCreatePage() {
     description: "",
     category: "",
     totalModifications: 3,
+    additionalModificationFee: 0,
     estimatedPrice: 0,
     schedule: {
       startDate: "",
@@ -83,6 +85,7 @@ export default function ProjectCreatePage() {
   // 클라이언트 수정 제안 데이터
   const [clientModifications, setClientModifications] = useState({
     totalModifications: projectData.totalModifications,
+    additionalModificationFee: projectData.additionalModificationFee,
     estimatedPrice: projectData.estimatedPrice,
     additionalDescription: "",
     additionalFiles: [] as File[],
@@ -143,6 +146,7 @@ export default function ProjectCreatePage() {
         setClientModifications(prev => ({
           ...prev,
           totalModifications: 3,
+          additionalModificationFee: 50000,
           estimatedPrice: 500000
         }));
       }
@@ -159,6 +163,7 @@ export default function ProjectCreatePage() {
         clientEmail: currentProposal.clientEmail || "",
         estimatedPrice: currentProposal.estimatedPrice || 0,
         totalModifications: currentProposal.totalModifications || 3,
+        additionalModificationFee: currentProposal.additionalModificationFee || 0,
         schedule: currentProposal.schedule || {
           startDate: "",
           draftDeadline: "",
@@ -276,6 +281,7 @@ export default function ProjectCreatePage() {
     const finalData = {
       ...projectData,
       totalModifications: clientModifications.totalModifications,
+      additionalModificationFee: clientModifications.additionalModificationFee,
       estimatedPrice: clientModifications.estimatedPrice,
       description:
         projectData.description +
@@ -302,6 +308,7 @@ export default function ProjectCreatePage() {
       budget_used: 0,
       total_modification_count: finalData.totalModifications,
       remaining_modification_count: finalData.totalModifications,
+      additional_modification_fee: clientModifications.additionalModificationFee,
       requirements: finalData.description,
       attached_files: finalData.additionalFiles?.map(f => f.name) || [],
       contract_file: finalData.contractFile?.name || "",
@@ -431,29 +438,72 @@ export default function ProjectCreatePage() {
                 max="10"
                 disabled={!canUserWork()}
               />
+              <div className="label">
+                <span className="label-text-alt text-base-content/60">
+                  계약된 무료 수정 횟수
+                </span>
+              </div>
             </div>
 
             <div className="form-control">
               <label className="label">
-                <span className="label-text font-medium">예상 견적 (원) *</span>
+                <span className="label-text font-medium">예상 견적 *</span>
               </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  className="input input-bordered w-full no-spinner pr-12"
+                  value={
+                    projectData.estimatedPrice === 0
+                      ? ""
+                      : projectData.estimatedPrice
+                  }
+                  onChange={(e) =>
+                    updateProjectData(
+                      "estimatedPrice",
+                      e.target.value === "" ? 0 : parseInt(e.target.value) || 0
+                    )
+                  }
+                  placeholder="예상 견적을 입력하세요"
+                  disabled={!canUserWork()}
+                />
+                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-base-content/60">
+                  원
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text font-medium">추가 수정 요금 *</span>
+            </label>
+            <div className="relative">
               <input
                 type="number"
-                className="input input-bordered w-full no-spinner"
+                className="input input-bordered w-full no-spinner pr-12"
                 value={
-                  projectData.estimatedPrice === 0
+                  projectData.additionalModificationFee === 0
                     ? ""
-                    : projectData.estimatedPrice
+                    : projectData.additionalModificationFee
                 }
                 onChange={(e) =>
                   updateProjectData(
-                    "estimatedPrice",
+                    "additionalModificationFee",
                     e.target.value === "" ? 0 : parseInt(e.target.value) || 0
                   )
                 }
-                placeholder="예상 견적을 입력하세요"
+                placeholder="협의된 수정 횟수 초과 시 추가 요금"
                 disabled={!canUserWork()}
               />
+              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-base-content/60">
+                원/회
+              </span>
+            </div>
+            <div className="label">
+              <span className="label-text-alt text-base-content/60">
+                무료 수정 횟수 초과 시 건당 부과될 요금
+              </span>
             </div>
           </div>
         </div>
@@ -795,6 +845,10 @@ export default function ProjectCreatePage() {
                 회
               </p>
               <p>
+                <strong>추가 수정 요금:</strong>{" "}
+                {projectData.additionalModificationFee.toLocaleString()}원/회
+              </p>
+              <p>
                 <strong>결제 방식:</strong>{" "}
                 {projectData.paymentTerms.method === "lump_sum"
                   ? "일시불"
@@ -842,27 +896,63 @@ export default function ProjectCreatePage() {
           <div className="form-control">
             <label className="label">
               <span className="label-text font-medium">
-                예상 견적 조정 (원)
+                추가 수정 요금 조정
               </span>
             </label>
-            <input
-              type="number"
-              className="input input-bordered w-full no-spinner"
-              value={
-                clientModifications.estimatedPrice === 0
-                  ? ""
-                  : clientModifications.estimatedPrice
-              }
-              onChange={(e) =>
-                setClientModifications((prev) => ({
-                  ...prev,
-                  estimatedPrice:
-                    e.target.value === "" ? 0 : parseInt(e.target.value) || 0,
-                }))
-              }
-              placeholder="조정할 견적을 입력하세요"
-              disabled={!canUserWork()}
-            />
+            <div className="relative">
+              <input
+                type="number"
+                className="input input-bordered w-full no-spinner pr-12"
+                value={
+                  clientModifications.additionalModificationFee === 0
+                    ? ""
+                    : clientModifications.additionalModificationFee
+                }
+                onChange={(e) =>
+                  setClientModifications((prev) => ({
+                    ...prev,
+                    additionalModificationFee:
+                      e.target.value === "" ? 0 : parseInt(e.target.value) || 0,
+                  }))
+                }
+                placeholder="초과 수정 시 건당 요금 조정"
+                disabled={!canUserWork()}
+              />
+              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-base-content/60">
+                원/회
+              </span>
+            </div>
+          </div>
+
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text font-medium">
+                예상 견적 조정
+              </span>
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                className="input input-bordered w-full no-spinner pr-12"
+                value={
+                  clientModifications.estimatedPrice === 0
+                    ? ""
+                    : clientModifications.estimatedPrice
+                }
+                onChange={(e) =>
+                  setClientModifications((prev) => ({
+                    ...prev,
+                    estimatedPrice:
+                      e.target.value === "" ? 0 : parseInt(e.target.value) || 0,
+                  }))
+                }
+                placeholder="조정할 견적을 입력하세요"
+                disabled={!canUserWork()}
+              />
+              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-base-content/60">
+                원
+              </span>
+            </div>
           </div>
         </div>
 
@@ -1034,6 +1124,19 @@ export default function ProjectCreatePage() {
                 </div>
 
                 <div className="flex justify-between">
+                  <span>추가 수정 요금:</span>
+                  <span>
+                    <span className="text-base-content/60 line-through">
+                      {projectData.additionalModificationFee.toLocaleString()}원/회
+                    </span>
+                    {" → "}
+                    <span className="font-semibold text-primary">
+                      {clientModifications.additionalModificationFee.toLocaleString()}원/회
+                    </span>
+                  </span>
+                </div>
+
+                <div className="flex justify-between">
                   <span>예상 견적:</span>
                   <span>
                     <span className="text-base-content/60 line-through">
@@ -1160,6 +1263,10 @@ export default function ProjectCreatePage() {
                 <p>
                   <strong>총 수정 횟수:</strong>{" "}
                   {clientModifications.totalModifications}회
+                </p>
+                <p>
+                  <strong>추가 수정 요금:</strong>{" "}
+                  {clientModifications.additionalModificationFee.toLocaleString()}원/회
                 </p>
                 <p>
                   <strong>최종 견적:</strong>{" "}
