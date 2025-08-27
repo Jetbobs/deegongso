@@ -38,6 +38,7 @@ const Sidebar = ({ userRole, isOpen, onClose }: SidebarProps) => {
     }
 
     baseItems.push(
+              { label: "공지사항", href: "/news", icon: "📰" },
       // { label: "계약 관리", href: "/contracts", icon: "📋" },
       // { label: "메시지", href: "/messages", icon: "💬", badge: 3 },
       { label: "설정", href: "/settings", icon: "⚙️" }

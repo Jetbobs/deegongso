@@ -277,6 +277,152 @@ export const ProjectNotifications = {
       onClick,
     });
   },
+
+  // 수정 요청 워크플로우 전용 알림
+  modificationRequestSubmitted: (
+    projectName: string,
+    requestNumber: number,
+    remainingCount: number,
+    isDesigner: boolean,
+    onClick?: () => void
+  ) => {
+    const title = isDesigner ? "수정 요청 도착" : "수정 요청 제출 완료";
+    const body = isDesigner 
+      ? `${projectName}의 ${requestNumber}차 수정 요청을 검토해주세요.`
+      : `${projectName}의 수정 요청이 제출되었습니다. (남은 횟수: ${remainingCount}회)`;
+    
+    return showPushNotification({
+      title,
+      body,
+      icon: "/favicon.ico",
+      tag: `modification-request-${requestNumber}`,
+      requireInteraction: isDesigner,
+      onClick,
+    });
+  },
+
+  clarificationRequested: (
+    projectName: string,
+    requestCount: number,
+    isClient: boolean,
+    onClick?: () => void
+  ) => {
+    const title = isClient ? "세부 설명 요청" : "세부 설명 요청 완료";
+    const body = isClient 
+      ? `${projectName}에 대한 세부 설명 요청 ${requestCount}건이 도착했습니다.`
+      : `${projectName}의 세부 설명 요청이 전송되었습니다.`;
+    
+    return showPushNotification({
+      title,
+      body,
+      icon: "/favicon.ico",
+      tag: "clarification",
+      requireInteraction: isClient,
+      onClick,
+    });
+  },
+
+  clarificationAnswered: (
+    projectName: string,
+    answeredCount: number,
+    totalCount: number,
+    isDesigner: boolean,
+    onClick?: () => void
+  ) => {
+    const title = isDesigner ? "세부 설명 답변 도착" : "세부 설명 답변 완료";
+    const body = isDesigner 
+      ? `${projectName}의 세부 설명 답변이 도착했습니다. (${answeredCount}/${totalCount})`
+      : `${projectName}의 세부 설명 답변이 전송되었습니다.`;
+    
+    return showPushNotification({
+      title,
+      body,
+      icon: "/favicon.ico",
+      tag: "clarification-answered",
+      onClick,
+    });
+  },
+
+  workProgressStarted: (
+    projectName: string,
+    totalItems: number,
+    estimatedCompletion: string,
+    isClient: boolean,
+    onClick?: () => void
+  ) => {
+    const title = isClient ? "작업 시작 알림" : "작업 계획 수립 완료";
+    const body = isClient 
+      ? `${projectName} 수정 작업이 시작되었습니다. (총 ${totalItems}개 항목, 예상 완료: ${new Date(estimatedCompletion).toLocaleDateString('ko-KR')})`
+      : `${projectName}의 작업 계획이 수립되었습니다.`;
+    
+    return showPushNotification({
+      title,
+      body,
+      icon: "/favicon.ico",
+      tag: "work-started",
+      onClick,
+    });
+  },
+
+  workProgressUpdated: (
+    projectName: string,
+    completedItems: number,
+    totalItems: number,
+    overallProgress: number,
+    isClient: boolean,
+    onClick?: () => void
+  ) => {
+    if (!isClient) return; // 디자이너에게는 알림 안 함
+    
+    const milestones = [25, 50, 75, 90]; // 주요 진행률에서만 알림
+    const shouldNotify = milestones.some(milestone => 
+      overallProgress >= milestone && (overallProgress - 10) < milestone
+    );
+    
+    if (!shouldNotify) return;
+    
+    return showPushNotification({
+      title: "작업 진행 상황 업데이트",
+      body: `${projectName} 수정 작업이 ${overallProgress}% 완료되었습니다. (${completedItems}/${totalItems} 항목 완료)`,
+      icon: "/favicon.ico",
+      tag: "work-progress",
+      onClick,
+    });
+  },
+
+  modificationCountDeducted: (
+    projectName: string,
+    remainingCount: number,
+    isClient: boolean,
+    onClick?: () => void
+  ) => {
+    if (!isClient) return; // 클라이언트에게만 알림
+    
+    return showPushNotification({
+      title: "수정 횟수 차감",
+      body: `${projectName}의 수정 횟수가 차감되었습니다. 남은 횟수: ${remainingCount}회`,
+      icon: "/favicon.ico",
+      tag: "count-deducted",
+      onClick,
+    });
+  },
+
+  modificationCountRestored: (
+    projectName: string,
+    restoredCount: number,
+    isClient: boolean,
+    onClick?: () => void
+  ) => {
+    if (!isClient) return; // 클라이언트에게만 알림
+    
+    return showPushNotification({
+      title: "수정 횟수 복구",
+      body: `${projectName}의 수정 요청이 거절되어 수정 횟수 1회가 복구되었습니다. (현재: ${restoredCount}회)`,
+      icon: "/favicon.ico",
+      tag: "count-restored",
+      onClick,
+    });
+  }
 };
 
 // 알림 설정 관리

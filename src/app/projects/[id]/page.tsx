@@ -9,7 +9,7 @@ import AuthWrapper from "@/components/auth/AuthWrapper";
 import { Project, Feedback, UserRole } from "@/types";
 import { ProjectWorkflowManager } from "@/lib/projectWorkflow";
 import { FeedbackVersionManager } from "@/lib/feedbackVersionManager";
-import ModificationRequestManager from "@/components/feedback/ModificationRequestManager";
+import SubmittedRequestsList from "@/components/feedback/SubmittedRequestsList";
 
 import FileUpload, { UploadedFile } from "@/components/ui/FileUpload";
 import { addNotification } from "@/lib/notifications";
@@ -19,6 +19,7 @@ import ModificationCountDisplay from "@/components/modification/ModificationCoun
 import EnhancedVersionUpload from "@/components/versions/EnhancedVersionUpload";
 import EnhancedVersionGallery from "@/components/versions/EnhancedVersionGallery";
 import EnhancedMarkupCanvas from "@/components/markup/EnhancedMarkupCanvas";
+import SubmittedModificationRequests from "@/components/feedback/SubmittedModificationRequests";
 import { initializeMockVersionData } from "@/lib/mockVersionData";
 import dynamic from "next/dynamic";
 
@@ -97,6 +98,57 @@ const MOCK_FEEDBACKS: Feedback[] = [
     version: 1,
     revision_request_count: 0,
   },
+  {
+    id: "feedback-3",
+    project_id: "1",
+    report_id: "report-1",
+    content: "헤더 영역의 배치가 불균형해 보입니다. 요소들 간의 간격을 조정해주세요.",
+    content_html:
+      "<p>헤더 영역의 <strong>배치가 불균형</strong>해 보입니다. 요소들 간의 <em>간격을 조정</em>해주세요.</p>",
+    priority: "medium",
+    category: "design",
+    status: "pending",
+    is_official: true,
+    submitted_at: "2024-01-22T12:15:00Z",
+    updated_at: "2024-01-22T12:15:00Z",
+    client_id: "1",
+    version: 1,
+    revision_request_count: 0,
+  },
+  {
+    id: "feedback-4",
+    project_id: "1",
+    report_id: "report-1",
+    content: "모바일 버전에서 버튼이 너무 작아서 터치하기 어려워요.",
+    content_html:
+      "<p>모바일 버전에서 <strong>버튼이 너무 작아서</strong> 터치하기 어려워요. 최소 44px 이상으로 키워주세요.</p>",
+    priority: "high",
+    category: "functionality",
+    status: "pending",
+    is_official: true,
+    submitted_at: "2024-01-22T13:45:00Z",
+    updated_at: "2024-01-22T13:45:00Z",
+    client_id: "1",
+    version: 1,
+    revision_request_count: 0,
+  },
+  {
+    id: "feedback-5",
+    project_id: "1",
+    report_id: "report-1",
+    content: "전체적인 컬러 팔레트가 브랜드 가이드라인과 맞지 않는 것 같습니다.",
+    content_html:
+      "<p>전체적인 <em>컬러 팔레트</em>가 브랜드 가이드라인과 맞지 않는 것 같습니다. 기존 브랜드 컬러를 더 활용해주세요.</p>",
+    priority: "low",
+    category: "design",
+    status: "resolved",
+    is_official: false,
+    submitted_at: "2024-01-22T14:20:00Z",
+    updated_at: "2024-01-22T16:30:00Z",
+    client_id: "1",
+    version: 1,
+    revision_request_count: 1,
+  },
 ];
 
 export default function EnhancedProjectDetailPage() {
@@ -131,6 +183,14 @@ export default function EnhancedProjectDetailPage() {
     title?: string;
     description?: string;
   } | null>(null);
+  
+  // 수정요청 관련 상태
+  const [checklistItems, setChecklistItems] = useState<any[]>([]);
+  const [markups, setMarkups] = useState<any[]>([]);
+  const [markupFeedbacks, setMarkupFeedbacks] = useState<any[]>([]);
+  const [currentRevisionNumber, setCurrentRevisionNumber] = useState(1);
+  const [totalRevisions, setTotalRevisions] = useState(3);
+  const [remainingRevisions, setRemainingRevisions] = useState(2);
   
   // 파일 필터링 상태
   const [fileSearchTerm, setFileSearchTerm] = useState('');
@@ -704,8 +764,13 @@ export default function EnhancedProjectDetailPage() {
                   });
                 }}
                 onFeedbackUpdate={(feedback) => {
+                  // 피드백 상태 업데이트 (아카이브 상태 포함)
+                  setFeedbacks(prev => 
+                    prev.map(f => f.id === feedback.id ? feedback : f)
+                  );
+                  
                   addNotification({
-                    message: `피드백 '${feedback.title}'이 업데이트되었습니다.`,
+                    message: `피드백 '${feedback.title || feedback.content}'이 업데이트되었습니다.`,
                     user_id: user?.id || "",
                     url: `/projects/${projectId}?tab=feedback`,
                   });
@@ -717,6 +782,41 @@ export default function EnhancedProjectDetailPage() {
                     url: `/projects/${projectId}?tab=feedback`,
                   });
                 }}
+                onChecklistUpdate={setChecklistItems}
+                onMarkupsUpdate={setMarkups}
+                onMarkupFeedbacksUpdate={setMarkupFeedbacks}
+                onRevisionUpdate={setCurrentRevisionNumber}
+                onRemainingRevisionsUpdate={setRemainingRevisions}
+              />
+            )}
+
+            {/* 제출된 수정요청 */}
+            {currentVersion && (
+              <SubmittedModificationRequests
+                projectId={projectId}
+                versionId={currentVersion.id}
+                checklistItems={checklistItems}
+                generalFeedbacks={feedbacks}
+                markups={markups}
+                feedbacks={markupFeedbacks}
+                userRole={userRole}
+                currentRevisionNumber={currentRevisionNumber}
+                totalRevisions={totalRevisions}
+                remainingRevisions={remainingRevisions}
+                onChecklistItemToggle={(itemId: string, completed: boolean) => {
+                  setChecklistItems(prev => 
+                    prev.map(item => 
+                      item.id === itemId 
+                        ? { 
+                            ...item, 
+                            completed, 
+                            isCompleted: completed,
+                            completedAt: completed ? new Date().toISOString() : undefined
+                          }
+                        : item
+                    )
+                  );
+                }}
               />
             )}
 
@@ -725,21 +825,10 @@ export default function EnhancedProjectDetailPage() {
               <span className="text-base-content/60">기존 피드백 시스템</span>
             </div>
 
-            {/* 기존 수정요청 관리 시스템 */}
-            <ModificationRequestManager
+            {/* 제출된 수정요청 목록 */}
+            <SubmittedRequestsList
               projectId={projectId}
-              reportId="report-1"
               isDesigner={userRole === "designer"}
-              onModificationRequestSubmit={(data) => {
-                // 수정요청이 제출되었을 때의 처리
-                console.log("New modification request submitted:", data);
-                
-                addNotification({
-                  message: "새로운 수정요청이 제출되었습니다.",
-                  user_id: user?.id || "",
-                  url: `/projects/${projectId}?tab=feedback`,
-                });
-              }}
             />
           </div>
         );

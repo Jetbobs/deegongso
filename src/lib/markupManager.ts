@@ -1,4 +1,4 @@
-import { ImageMarkup, MarkupFeedback, MarkupType, FeedbackCategory } from "@/types";
+import { ImageMarkup, MarkupFeedback, MarkupType, FeedbackCategory, MarkupComment } from "@/types";
 
 /**
  * 이미지 마크업 관리를 위한 유틸리티 클래스
@@ -251,6 +251,240 @@ export class MarkupManager {
     };
   }
 
+  // ========== 마크업 댓글 관리 메서드들 ==========
+
+  /**
+   * 마크업 댓글을 가져옵니다
+   */
+  static getMarkupComments(markupId: string): MarkupComment[] {
+    const stored = localStorage.getItem(`markup_comments_${markupId}`);
+    return stored ? JSON.parse(stored) : [];
+  }
+
+  /**
+   * 마크업 댓글을 저장합니다
+   */
+  static saveMarkupComments(markupId: string, comments: MarkupComment[]): void {
+    localStorage.setItem(`markup_comments_${markupId}`, JSON.stringify(comments));
+    
+    // 마크업 정보 업데이트 (댓글 수, 미해결 댓글 여부)
+    this.updateMarkupCommentInfo(markupId, comments);
+  }
+
+  /**
+   * 새 댓글을 추가합니다
+   */
+  static addMarkupComment(
+    markupId: string,
+    authorId: string,
+    authorName: string,
+    authorRole: "client" | "designer",
+    content: string,
+    parentId?: string
+  ): MarkupComment {
+    const comment: MarkupComment = {
+      id: this.generateId(),
+      markup_id: markupId,
+      author_id: authorId,
+      author_name: authorName,
+      author_role: authorRole,
+      content,
+      created_at: new Date().toISOString(),
+      parent_id: parentId,
+      is_resolved: false
+    };
+
+    const existingComments = this.getMarkupComments(markupId);
+    const updatedComments = [...existingComments, comment];
+    this.saveMarkupComments(markupId, updatedComments);
+
+    console.log(`💬 마크업 댓글 추가: ${content}`);
+    return comment;
+  }
+
+  /**
+   * 댓글을 삭제합니다 (대댓글도 함께)
+   */
+  static deleteMarkupComment(markupId: string, commentId: string): boolean {
+    const existingComments = this.getMarkupComments(markupId);
+    
+    // 해당 댓글과 그 대댓글들을 모두 삭제
+    const updatedComments = existingComments.filter(
+      c => c.id !== commentId && c.parent_id !== commentId
+    );
+    
+    this.saveMarkupComments(markupId, updatedComments);
+    
+    console.log(`🗑️ 마크업 댓글 삭제: ${commentId}`);
+    return true;
+  }
+
+  /**
+   * 댓글의 해결 상태를 변경합니다
+   */
+  static toggleMarkupCommentResolved(
+    markupId: string,
+    commentId: string,
+    resolvedBy: string
+  ): boolean {
+    const existingComments = this.getMarkupComments(markupId);
+    const updatedComments = existingComments.map(comment => {
+      if (comment.id === commentId) {
+        const newResolvedState = !comment.is_resolved;
+        return {
+          ...comment,
+          is_resolved: newResolvedState,
+          resolved_at: newResolvedState ? new Date().toISOString() : undefined,
+          resolved_by: newResolvedState ? resolvedBy : undefined
+        };
+      }
+      return comment;
+    });
+
+    this.saveMarkupComments(markupId, updatedComments);
+    
+    const comment = updatedComments.find(c => c.id === commentId);
+    console.log(`✅ 댓글 해결 상태 변경: ${comment?.is_resolved ? '해결됨' : '미해결'}`);
+    return true;
+  }
+
+  /**
+   * 마크업의 댓글 정보를 업데이트합니다
+   */
+  private static updateMarkupCommentInfo(markupId: string, comments: MarkupComment[]): void {
+    const markup = this.getMarkup(markupId);
+    if (!markup) return;
+
+    const commentCount = comments.length;
+    const hasUnresolved = comments.some(c => !c.is_resolved);
+
+    const updatedMarkup = {
+      ...markup,
+      comment_count: commentCount,
+      has_unresolved_comments: hasUnresolved
+    };
+
+    this.saveMarkup(updatedMarkup);
+  }
+
+  /**
+   * 버전의 모든 마크업 댓글 통계를 가져옵니다
+   */
+  static getVersionCommentStats(versionId: string) {
+    const markups = this.getVersionMarkups(versionId);
+    let totalComments = 0;
+    let unresolvedComments = 0;
+    let resolvedComments = 0;
+
+    markups.forEach(markup => {
+      const comments = this.getMarkupComments(markup.id);
+      totalComments += comments.length;
+      unresolvedComments += comments.filter(c => !c.is_resolved).length;
+      resolvedComments += comments.filter(c => c.is_resolved).length;
+    });
+
+    return {
+      total_comments: totalComments,
+      unresolved_comments: unresolvedComments,
+      resolved_comments: resolvedComments,
+      markups_with_comments: markups.filter(m => (m.comment_count || 0) > 0).length,
+      markups_with_unresolved: markups.filter(m => m.has_unresolved_comments).length
+    };
+  }
+
+  // ========== 체크리스트 댓글 관리 메서드들 ==========
+
+  /**
+   * 체크리스트 항목 댓글을 가져옵니다
+   */
+  static getChecklistComments(checklistItemId: string): MarkupComment[] {
+    const stored = localStorage.getItem(`checklist_comments_${checklistItemId}`);
+    return stored ? JSON.parse(stored) : [];
+  }
+
+  /**
+   * 체크리스트 항목 댓글을 저장합니다
+   */
+  static saveChecklistComments(checklistItemId: string, comments: MarkupComment[]): void {
+    localStorage.setItem(`checklist_comments_${checklistItemId}`, JSON.stringify(comments));
+  }
+
+  /**
+   * 체크리스트 항목에 새 댓글을 추가합니다
+   */
+  static addChecklistComment(
+    checklistItemId: string,
+    authorId: string,
+    authorName: string,
+    authorRole: "client" | "designer",
+    content: string,
+    parentId?: string
+  ): MarkupComment {
+    const comment: MarkupComment = {
+      id: this.generateId(),
+      markup_id: checklistItemId, // 체크리스트 ID를 마크업 ID 필드에 저장
+      author_id: authorId,
+      author_name: authorName,
+      author_role: authorRole,
+      content,
+      created_at: new Date().toISOString(),
+      parent_id: parentId,
+      is_resolved: false
+    };
+
+    const existingComments = this.getChecklistComments(checklistItemId);
+    const updatedComments = [...existingComments, comment];
+    this.saveChecklistComments(checklistItemId, updatedComments);
+
+    console.log(`💬 체크리스트 댓글 추가: ${content}`);
+    return comment;
+  }
+
+  /**
+   * 체크리스트 댓글을 삭제합니다
+   */
+  static deleteChecklistComment(checklistItemId: string, commentId: string): boolean {
+    const existingComments = this.getChecklistComments(checklistItemId);
+    
+    const updatedComments = existingComments.filter(
+      c => c.id !== commentId && c.parent_id !== commentId
+    );
+    
+    this.saveChecklistComments(checklistItemId, updatedComments);
+    
+    console.log(`🗑️ 체크리스트 댓글 삭제: ${commentId}`);
+    return true;
+  }
+
+  /**
+   * 체크리스트 댓글의 해결 상태를 변경합니다
+   */
+  static toggleChecklistCommentResolved(
+    checklistItemId: string,
+    commentId: string,
+    resolvedBy: string
+  ): boolean {
+    const existingComments = this.getChecklistComments(checklistItemId);
+    const updatedComments = existingComments.map(comment => {
+      if (comment.id === commentId) {
+        const newResolvedState = !comment.is_resolved;
+        return {
+          ...comment,
+          is_resolved: newResolvedState,
+          resolved_at: newResolvedState ? new Date().toISOString() : undefined,
+          resolved_by: newResolvedState ? resolvedBy : undefined
+        };
+      }
+      return comment;
+    });
+
+    this.saveChecklistComments(checklistItemId, updatedComments);
+    
+    const comment = updatedComments.find(c => c.id === commentId);
+    console.log(`✅ 체크리스트 댓글 해결 상태 변경: ${comment?.is_resolved ? '해결됨' : '미해결'}`);
+    return true;
+  }
+
   // Private helper methods
   private static saveMarkup(markup: ImageMarkup): void {
     localStorage.setItem(`markup_${markup.id}`, JSON.stringify(markup));
@@ -274,6 +508,72 @@ export class MarkupManager {
 
   private static saveVersionMarkups(versionId: string, markups: ImageMarkup[]): void {
     localStorage.setItem(`version_markups_${versionId}`, JSON.stringify(markups));
+  }
+
+  // ========== 아카이브 관리 메서드들 ==========
+
+  /**
+   * 차수별 데이터 아카이브
+   */
+  static archiveVersionData(versionId: string, revisionNumber: number, data: {
+    markups: any[];
+    feedbacks: any[];
+    generalFeedbacks: any[];
+  }): boolean {
+    try {
+      const archiveKey = `markup_archive_${versionId}_rev${revisionNumber}`;
+      const archiveData = {
+        versionId,
+        revisionNumber,
+        archivedAt: new Date().toISOString(),
+        markups: data.markups,
+        feedbacks: data.feedbacks,
+        generalFeedbacks: data.generalFeedbacks
+      };
+      
+      localStorage.setItem(archiveKey, JSON.stringify(archiveData));
+      console.log(`차수 ${revisionNumber} 데이터 아카이브 완료:`, archiveData);
+      return true;
+    } catch (error) {
+      console.error('데이터 아카이브 실패:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 아카이브된 데이터 조회
+   */
+  static getArchivedVersionData(versionId: string, revisionNumber: number): any | null {
+    try {
+      const archiveKey = `markup_archive_${versionId}_rev${revisionNumber}`;
+      const archiveData = localStorage.getItem(archiveKey);
+      return archiveData ? JSON.parse(archiveData) : null;
+    } catch (error) {
+      console.error('아카이브 데이터 조회 실패:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 버전의 모든 아카이브 조회
+   */
+  static getAllArchivedRevisions(versionId: string): any[] {
+    try {
+      const archives: any[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(`markup_archive_${versionId}_rev`)) {
+          const archiveData = localStorage.getItem(key);
+          if (archiveData) {
+            archives.push(JSON.parse(archiveData));
+          }
+        }
+      }
+      return archives.sort((a, b) => a.revisionNumber - b.revisionNumber);
+    } catch (error) {
+      console.error('아카이브 목록 조회 실패:', error);
+      return [];
+    }
   }
 }
 
@@ -331,3 +631,4 @@ export const FEEDBACK_CATEGORIES = [
   { value: 'style' as FeedbackCategory, label: '스타일', icon: '✨' },
   { value: 'general' as FeedbackCategory, label: '일반', icon: '💭' },
 ];
+

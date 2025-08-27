@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { MarkupManager, MARKUP_TOOLS, FEEDBACK_CATEGORIES } from '@/lib/markupManager';
 import { ImageMarkup, MarkupFeedback, MarkupType, FeedbackCategory, DesignVersion, UserRole, ChecklistItem } from '@/types';
+import MarkupComments from './MarkupComments';
 
 interface EnhancedMarkupCanvasProps {
   version: DesignVersion;
@@ -14,6 +15,11 @@ interface EnhancedMarkupCanvasProps {
   onFeedbackUpdate?: (feedback: MarkupFeedback) => void;
   onMarkupDelete?: (markup: ImageMarkup) => void;
   readonly?: boolean;
+  onChecklistUpdate?: (checklistItems: any[]) => void;
+  onMarkupsUpdate?: (markups: any[]) => void;
+  onMarkupFeedbacksUpdate?: (feedbacks: any[]) => void;
+  onRevisionUpdate?: (revisionNumber: number) => void;
+  onRemainingRevisionsUpdate?: (remaining: number) => void;
 }
 
 interface CanvasPosition {
@@ -40,7 +46,12 @@ export default function EnhancedMarkupCanvas({
   onFeedbackCreate,
   onFeedbackUpdate,
   onMarkupDelete,
-  readonly = false
+  readonly = false,
+  onChecklistUpdate,
+  onMarkupsUpdate,
+  onMarkupFeedbacksUpdate,
+  onRevisionUpdate,
+  onRemainingRevisionsUpdate
 }: EnhancedMarkupCanvasProps) {
   const [selectedTool, setSelectedTool] = useState<MarkupType>('point');
   const [markups, setMarkups] = useState<ImageMarkup[]>([]);
@@ -58,6 +69,7 @@ export default function EnhancedMarkupCanvas({
   });
   const [isDrawing, setIsDrawing] = useState(false);
   const [showMarkupList, setShowMarkupList] = useState(true);
+  const [commentStats, setCommentStats] = useState(MarkupManager.getVersionCommentStats(version.id));
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
   const [newChecklistItem, setNewChecklistItem] = useState('');
   const [showChecklistForm, setShowChecklistForm] = useState(false);
@@ -68,6 +80,39 @@ export default function EnhancedMarkupCanvas({
     referenceUrls: [] as string[],
     referenceFiles: [] as File[]
   });
+  const [currentRevisionNumber, setCurrentRevisionNumber] = useState(1);
+  const [totalRevisions, setTotalRevisions] = useState(3); // 프로젝트 생성 시 설정된 수정 횟수
+  const [remainingRevisions, setRemainingRevisions] = useState(2); // 남은 수정 횟수 (첫 제출로 1회 차감된 상태)
+  const [isFirstSubmission, setIsFirstSubmission] = useState(true); // 첫 제출 여부
+  
+  // 아코디언 상태 관리
+  const [expandedMarkups, setExpandedMarkups] = useState<Set<string>>(new Set());
+  const [expandedFeedbacks, setExpandedFeedbacks] = useState<Set<string>>(new Set());
+  
+  // 아코디언 토글 함수
+  const toggleMarkupExpansion = (markupId: string) => {
+    setExpandedMarkups(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(markupId)) {
+        newSet.delete(markupId);
+      } else {
+        newSet.add(markupId);
+      }
+      return newSet;
+    });
+  };
+  
+  const toggleFeedbackExpansion = (feedbackId: string) => {
+    setExpandedFeedbacks(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(feedbackId)) {
+        newSet.delete(feedbackId);
+      } else {
+        newSet.add(feedbackId);
+      }
+      return newSet;
+    });
+  };
   
   const canvasRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -77,17 +122,215 @@ export default function EnhancedMarkupCanvas({
     const loadMarkupsAndFeedbacks = () => {
       const versionMarkups = MarkupManager.getVersionMarkups(version.id);
       const versionFeedbacks = MarkupManager.getVersionMarkupFeedbacks(version.id);
+      const versionCommentStats = MarkupManager.getVersionCommentStats(version.id);
+      
+      // 테스트용 마크업이 없으면 하나 생성 (개발 시에만)
+      if (versionMarkups.length === 0 && process.env.NODE_ENV === 'development') {
+        console.log('테스트용 마크업 생성 중...');
+        const testMarkup = MarkupManager.createMarkup(
+          version.id,
+          25,
+          30,
+          'point',
+          currentUserId || 'test-user'
+        );
+        console.log('테스트 마크업 생성됨:', testMarkup);
+        
+        // 새로 생성된 마크업 포함하여 다시 로드
+        const updatedMarkups = MarkupManager.getVersionMarkups(version.id);
+        setMarkups(updatedMarkups);
+      } else {
+      setMarkups(versionMarkups);
+      }
+      
+      setFeedbacks(versionFeedbacks);
+      setCommentStats(versionCommentStats);
+    };
+
+    loadMarkupsAndFeedbacks();
+  }, [version.id, currentUserId]);
+
+  // 상태 변경 시 부모 컴포넌트에 알림
+  useEffect(() => {
+    onChecklistUpdate?.(checklistItems);
+  }, [checklistItems, onChecklistUpdate]);
+
+  useEffect(() => {
+    onMarkupsUpdate?.(markups);
+  }, [markups, onMarkupsUpdate]);
+
+  useEffect(() => {
+    onMarkupFeedbacksUpdate?.(feedbacks);
+  }, [feedbacks, onMarkupFeedbacksUpdate]);
+
+  useEffect(() => {
+    onRevisionUpdate?.(currentRevisionNumber);
+  }, [currentRevisionNumber, onRevisionUpdate]);
+
+  useEffect(() => {
+    onRemainingRevisionsUpdate?.(remainingRevisions);
+  }, [remainingRevisions, onRemainingRevisionsUpdate]);
+
+  // 댓글 변경 후 마크업 데이터 리로드
+  const handleCommentChange = useCallback(() => {
+    const loadMarkupsAndFeedbacks = () => {
+      const versionMarkups = MarkupManager.getVersionMarkups(version.id);
+      const versionFeedbacks = MarkupManager.getVersionMarkupFeedbacks(version.id);
+      const versionCommentStats = MarkupManager.getVersionCommentStats(version.id);
       
       setMarkups(versionMarkups);
       setFeedbacks(versionFeedbacks);
+      setCommentStats(versionCommentStats);
     };
 
     loadMarkupsAndFeedbacks();
   }, [version.id]);
 
-  // 캔버스 클릭 처리
+  // 검토 승인 시 새로운 차수의 체크리스트 생성
+  const handleApprovalAndCreateNewRevision = () => {
+    // 현재 체크리스트의 완료된 항목들을 기반으로 새로운 차수 생성
+    const completedItems = checklistItems.filter(item => item.completed);
+    const pendingItems = checklistItems.filter(item => !item.completed && !item.isRevisionHeader);
+    
+    if (pendingItems.length > 0) {
+      alert('아직 완료되지 않은 체크리스트 항목이 있습니다. 모든 항목을 완료한 후 승인해주세요.');
+      return;
+    }
+
+    // 남은 수정 횟수 확인
+    if (remainingRevisions <= 0) {
+      alert('남은 수정 횟수가 없습니다. 추가 수정이 필요한 경우 수정 횟수를 추가 구매해주세요.');
+      return;
+    }
+
+    const nextRevisionNumber = currentRevisionNumber + 1;
+    
+    // 현재 차수의 모든 항목을 완료 상태로 변경 (히스토리 보존)
+    const completedChecklistItems = checklistItems.map(item => ({
+      ...item,
+      completed: true,
+      isCompleted: true,
+      completedAt: new Date().toISOString(),
+      revisionNumber: item.revisionNumber || currentRevisionNumber // 차수 정보 저장
+    }));
+    
+    // 새로운 차수의 체크리스트 헤더 생성
+    const newRevisionHeader: ChecklistItem = {
+      id: `revision-${nextRevisionNumber}-header`,
+      content: `${nextRevisionNumber}회차 수정 요청사항`,
+      priority: 'high',
+      completed: false,
+      isCompleted: false,
+      type: 'manual',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      description: `${currentRevisionNumber}회차 검토 완료 후 새로운 수정사항 (남은 횟수: ${remainingRevisions - 1}회)`,
+      isRevisionHeader: true,
+      revisionNumber: nextRevisionNumber
+    };
+
+    // 승인된 마크업과 일반 피드백을 체크리스트에 추가 (아직 체크리스트에 없는 경우)
+    const additionalChecklistItems: ChecklistItem[] = [];
+    
+    // 마크업 피드백을 체크리스트에 추가
+    markups.forEach(markup => {
+      const markupFeedback = feedbacks.find(f => f.id === markup.feedback_id);
+      if (markupFeedback) {
+        const existingItem = checklistItems.find(item => item.markupFeedbackId === markup.feedback_id);
+        if (!existingItem) {
+          additionalChecklistItems.push({
+            id: `markup-completed-${markupFeedback.id}`,
+            content: markupFeedback.title,
+            completed: true,
+            isCompleted: true,
+            createdAt: markupFeedback.created_at,
+            updatedAt: new Date().toISOString(),
+            completedAt: new Date().toISOString(),
+            priority: markupFeedback.priority,
+            type: 'markup',
+            markupFeedbackId: markupFeedback.id,
+            revisionNumber: currentRevisionNumber
+          });
+        }
+      }
+    });
+    
+    // 일반 피드백을 체크리스트에 추가
+    generalFeedbacks.forEach(feedback => {
+      const existingItem = checklistItems.find(item => item.content === feedback.content);
+      if (!existingItem) {
+        additionalChecklistItems.push({
+          id: `general-completed-${feedback.id}`,
+          content: feedback.content,
+          completed: true,
+          isCompleted: true,
+          createdAt: feedback.submitted_at,
+          updatedAt: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+          priority: feedback.priority,
+          type: 'general',
+          revisionNumber: currentRevisionNumber
+        });
+      }
+    });
+    
+    // 체크리스트 업데이트: 기존 항목들을 완료 상태로 + 추가 항목들 + 새로운 차수 헤더 추가
+    setChecklistItems([...completedChecklistItems, ...additionalChecklistItems, newRevisionHeader]);
+    setCurrentRevisionNumber(nextRevisionNumber);
+    setRemainingRevisions(remainingRevisions - 1);
+    
+    // 종합 검토 리스트 초기화 (현재 피드백과 마크업을 히스토리로 이동)
+    // 마크업과 피드백을 히스토리 상태로 변경하여 종합 검토 리스트에서 제거
+    const archivedMarkups = markups.map(markup => ({
+      ...markup,
+      isArchived: true,
+      archivedAt: new Date().toISOString(),
+      revisionNumber: currentRevisionNumber
+    }));
+    
+    const archivedFeedbacks = feedbacks.map(feedback => ({
+      ...feedback,
+      isArchived: true,
+      archivedAt: new Date().toISOString(),
+      revisionNumber: currentRevisionNumber
+    }));
+    
+    // 일반 피드백도 아카이브 상태로 설정
+    const archivedGeneralFeedbacks = generalFeedbacks.map(feedback => ({
+      ...feedback,
+      isArchived: true,
+      archivedAt: new Date().toISOString(),
+      revisionNumber: currentRevisionNumber
+    }));
+    
+    // 마크업과 피드백을 아카이브 상태로 설정 (실제로는 localStorage나 서버에 저장)
+    MarkupManager.archiveVersionData(version.id, currentRevisionNumber, {
+      markups: archivedMarkups,
+      feedbacks: archivedFeedbacks,
+      generalFeedbacks: archivedGeneralFeedbacks
+    });
+    
+    // 현재 활성 마크업과 피드백 초기화 (새로운 차수를 위해)
+    setMarkups([]);
+    setFeedbacks([]);
+    
+    // 일반 피드백도 아카이브된 상태로 업데이트 (부모 컴포넌트에 알림)
+    if (onFeedbackUpdate) {
+      archivedGeneralFeedbacks.forEach(feedback => {
+        onFeedbackUpdate(feedback);
+      });
+    }
+    
+    console.log(`검토 승인 완료: ${currentRevisionNumber}회차 → ${nextRevisionNumber}회차 수정 단계로 진행`);
+    console.log(`수정 횟수 차감: ${remainingRevisions} → ${remainingRevisions - 1}회 남음`);
+    console.log('이전 차수 데이터 아카이브 완료');
+    
+    alert(`${currentRevisionNumber}회차 검토가 승인되었습니다.\n\n✅ 이전 피드백들이 완료 처리되었습니다.\n📋 ${nextRevisionNumber}회차 수정 요청사항을 새로 추가할 수 있습니다.\n\n남은 수정 횟수: ${remainingRevisions - 1}회`);
+  };
+
+  // 캔버스 클릭 처리 (클라이언트만)
   const handleCanvasClick = useCallback((event: React.MouseEvent) => {
-    if (readonly || !canvasRef.current || !imageRef.current) return;
+    if (readonly || userRole !== 'client' || !canvasRef.current || !imageRef.current) return;
 
     const rect = canvasRef.current.getBoundingClientRect();
     const imageRect = imageRef.current.getBoundingClientRect();
@@ -200,6 +443,7 @@ export default function EnhancedMarkupCanvas({
         const checklistItem: ChecklistItem = {
           id: `markup-${newFeedback.id}`,
           content: newFeedback.title,
+          completed: false,
           isCompleted: false,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -207,7 +451,15 @@ export default function EnhancedMarkupCanvas({
           type: 'markup',
           markupFeedbackId: newFeedback.id
         };
-        setChecklistItems(prev => [...prev, checklistItem]);
+        setChecklistItems(prev => {
+          const newItems = [...prev, checklistItem];
+          // 첫 제출 완료 표시
+          if (isFirstSubmission) {
+            setIsFirstSubmission(false);
+            console.log(`1회차 수정 요청 시작 (이미 차감됨: ${totalRevisions - remainingRevisions}회 사용)`);
+          }
+          return newItems;
+        });
         
         // 마크업에 피드백 연결 업데이트
         const updatedMarkup = { ...selectedMarkup, feedback_id: newFeedback.id };
@@ -282,6 +534,7 @@ export default function EnhancedMarkupCanvas({
       description: checklistForm.description.trim() || undefined,
       referenceUrls: checklistForm.referenceUrls.filter(url => url.trim()),
       // referenceFiles는 실제 업로드 구현 필요
+      completed: false,
       isCompleted: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -289,13 +542,21 @@ export default function EnhancedMarkupCanvas({
       type: 'general'
     };
     
-    setChecklistItems(prev => [...prev, newItem]);
+        setChecklistItems(prev => {
+      const newItems = [...prev, newItem];
+      // 첫 제출 완료 표시
+      if (isFirstSubmission && prev.length === 0) {
+        setIsFirstSubmission(false);
+        console.log(`1회차 수정 요청 시작 (이미 차감됨: ${totalRevisions - remainingRevisions}회 사용)`);
+      }
+      return newItems;
+    });
     setChecklistForm({ 
       content: '', 
       priority: 'medium', 
-      description: '', 
-      referenceUrls: [], 
-      referenceFiles: [] 
+      description: '',
+      referenceUrls: [],
+      referenceFiles: []
     });
     setShowChecklistForm(false);
   };
@@ -310,6 +571,103 @@ export default function EnhancedMarkupCanvas({
 
   const removeChecklistItem = (itemId: string) => {
     setChecklistItems(prev => prev.filter(item => item.id !== itemId));
+  };
+
+  // 수정 요청 제출 함수
+  const handleSubmitModificationRequest = async () => {
+    if (markups.length === 0 && checklistItems.length === 0) {
+      alert('마크업 피드백이나 수정사항이 없습니다. 최소 하나는 작성해주세요.');
+      return;
+    }
+
+    // 확인 다이얼로그
+    const confirmMessage = `📤 수정 요청을 제출하시겠습니까?\n\n` +
+      `마크업 피드백: ${markups.length}개\n` +
+      `수정 체크리스트: ${checklistItems.length}개\n\n` +
+      `⚠️ 제출 시 수정 횟수가 즉시 차감됩니다.`;
+
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      // ModificationRequest 데이터 생성
+      const requestData = {
+        description: `마크업 피드백 ${markups.length}개 및 수정 체크리스트 ${checklistItems.length}개 항목`,
+        feedback_ids: feedbacks.map(f => f.id),
+        urgency: 'normal' as const,
+        notes: `프로젝트 ${projectId} 버전 ${version.id}에서 생성된 수정 요청`,
+        checklist_items: checklistItems.map(item => ({
+          content: item.content,
+          description: item.description,
+          priority: item.priority,
+          type: item.type,
+          markupFeedbackId: item.markupFeedbackId
+        }))
+      };
+
+      // 실제로는 API 호출하여 서버에 저장 + 수정 횟수 차감
+      console.log('🚀 수정 요청 제출:', requestData);
+      
+      // 성공 메시지
+      alert('✅ 수정 요청이 성공적으로 제출되었습니다!\n디자이너에게 알림이 전송됩니다.');
+      
+      // onFeedbackCreate 콜백 호출 (상위 컴포넌트에 알림)
+      // 실제로는 ModificationRequest 객체를 생성하여 전달
+      
+    } catch (error) {
+      console.error('수정 요청 제출 실패:', error);
+      alert('❌ 수정 요청 제출에 실패했습니다. 다시 시도해주세요.');
+    }
+  };
+
+  // 디자이너의 수정요청 승인 함수
+  const handleApproveModificationRequest = async () => {
+    const confirmMessage = `✅ 이 수정요청을 승인하시겠습니까?\n\n승인 후 작업을 시작하게 됩니다.`;
+    
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      // 실제로는 API 호출하여 승인 처리
+      console.log('✅ 수정 요청 승인됨');
+      alert('✅ 수정 요청이 승인되었습니다!\n작업을 시작해주세요.');
+      
+      // TODO: 상태 업데이트 및 알림
+      
+    } catch (error) {
+      console.error('수정 요청 승인 실패:', error);
+      alert('❌ 승인 처리에 실패했습니다. 다시 시도해주세요.');
+    }
+  };
+
+  // 디자이너의 수정요청 거절 함수 (수정 횟수 복구 포함)
+  const handleRejectModificationRequest = async () => {
+    const reason = prompt('거절 사유를 입력해주세요:');
+    if (!reason) return;
+
+    const confirmMessage = `❌ 이 수정요청을 거절하시겠습니까?\n\n⚠️ 거절해도 수정 횟수는 복구되지 않습니다.\n\n거절 사유: ${reason}`;
+    
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      // 실제로는 API 호출하여 거절 처리 (수정 횟수는 복구하지 않음)
+      console.log('❌ 수정 요청 거절됨:', reason);
+      
+      alert('❌ 수정 요청이 거절되었습니다!\n클라이언트에게 알림이 전송됩니다.');
+      
+      // TODO: 
+      // 1. 수정요청 상태를 'rejected'로 변경
+      // 2. rejection_reason에 사유 저장  
+      // 3. 클라이언트에게 거절 알림 전송 (수정 횟수는 복구하지 않음)
+      
+    } catch (error) {
+      console.error('수정 요청 거절 실패:', error);
+      alert('❌ 거절 처리에 실패했습니다. 다시 시도해주세요.');
+    }
   };
 
   const updateChecklistItemPriority = (itemId: string, priority: ChecklistItem['priority']) => {
@@ -521,7 +879,8 @@ export default function EnhancedMarkupCanvas({
 
         {/* 사이드바 */}
         <div className="space-y-4">
-          {/* 마크업 목록 */}
+          {/* 마크업 목록 (클라이언트용) */}
+          {userRole === 'client' && (
           <div className="card bg-base-100 shadow-sm">
             <div className="card-body p-4">
               <div className="flex items-center justify-between mb-4">
@@ -585,6 +944,15 @@ export default function EnhancedMarkupCanvas({
                                     {feedback.title}
                                   </span>
                                 )}
+                                
+                                {/* 댓글 표시 */}
+                                <div className="flex items-center space-x-1 text-xs text-base-content/60">
+                                  <span>💬</span>
+                                  <span>{markup.comment_count || 0}</span>
+                                  {markup.has_unresolved_comments && (
+                                    <span className="badge badge-error badge-xs">미해결</span>
+                                  )}
+                                </div>
                               </div>
                               
                               <div className="flex items-center space-x-1">
@@ -677,6 +1045,17 @@ export default function EnhancedMarkupCanvas({
                                     )}
                                   </div>
                                 )}
+                                
+                                {/* 마크업 댓글 섹션 */}
+                                <div className="mt-4 border-t border-base-200 pt-3">
+                                  <MarkupComments 
+                                    markupId={markup.id}
+                                    onCommentCountChange={handleCommentChange}
+                                    onResolveStatusChange={handleCommentChange}
+                                    isDesigner={userRole === 'designer'}
+                                    projectId={projectId}
+                                  />
+                                </div>
                               </div>
                             </div>
                           )}
@@ -696,6 +1075,17 @@ export default function EnhancedMarkupCanvas({
                                     피드백 작성하기
                                   </button>
                                 )}
+                                
+                                {/* 피드백이 없는 마크업에도 댓글 기능 추가 */}
+                                <div className="mt-4 border-t border-base-200 pt-3">
+                                  <MarkupComments 
+                                    markupId={markup.id}
+                                    onCommentCountChange={handleCommentChange}
+                                    onResolveStatusChange={handleCommentChange}
+                                    isDesigner={userRole === 'designer'}
+                                    projectId={projectId}
+                                  />
+                                </div>
                               </div>
                             </div>
                           )}
@@ -707,8 +1097,10 @@ export default function EnhancedMarkupCanvas({
               )}
             </div>
           </div>
+          )}
 
-          {/* 독립적인 수정 체크리스트 */}
+          {/* 독립적인 수정 체크리스트 (클라이언트용) */}
+          {userRole === 'client' && (
           <div className="card bg-base-100 shadow-sm">
             <div className="card-body p-4">
               <div className="flex items-center justify-between mb-4">
@@ -719,8 +1111,8 @@ export default function EnhancedMarkupCanvas({
               </div>
               
               <div className="space-y-4">
-                {/* 새 체크리스트 항목 추가 버튼 */}
-                {!readonly && (
+                {/* 새 체크리스트 항목 추가 버튼 (클라이언트만) */}
+                {!readonly && userRole === 'client' && (
                   <button
                     className="btn btn-primary btn-sm w-full"
                     onClick={() => setShowChecklistForm(true)}
@@ -743,17 +1135,19 @@ export default function EnhancedMarkupCanvas({
                     checklistItems.map((item) => (
                       <div
                         key={item.id}
-                        className={`flex items-start gap-3 p-3 rounded border transition-colors ${
+                        className={`p-3 rounded border transition-colors ${
                           item.isCompleted 
                             ? 'bg-success/10 border-success/30' 
                             : 'bg-base-200/50 border-base-300'
                         }`}
                       >
+                        {/* 체크리스트 항목 내용 */}
+                        <div className="flex items-start gap-3">
                         <input
                           type="checkbox"
                           className="checkbox checkbox-sm mt-0.5"
                           checked={item.isCompleted}
-                          disabled={readonly}
+                          disabled={readonly || userRole !== 'client'}
                           onChange={() => {
                             toggleChecklistItem(item.id);
                             // 마크업 피드백과 연결된 항목이면 피드백 상태도 업데이트
@@ -801,7 +1195,7 @@ export default function EnhancedMarkupCanvas({
                             <select
                               className="select select-xs w-auto"
                               value={item.priority}
-                              disabled={readonly}
+                              disabled={readonly || userRole !== 'client'}
                               onChange={(e) => updateChecklistItemPriority(item.id, e.target.value as ChecklistItem['priority'])}
                             >
                               <option value="low">낮음</option>
@@ -828,7 +1222,7 @@ export default function EnhancedMarkupCanvas({
                             )}
                           </div>
                         </div>
-                        {!readonly && item.type === 'general' && (
+                        {!readonly && userRole === 'client' && item.type === 'general' && (
                           <button
                             className="btn btn-ghost btn-xs text-error"
                             onClick={() => removeChecklistItem(item.id)}
@@ -836,6 +1230,8 @@ export default function EnhancedMarkupCanvas({
                             ✕
                           </button>
                         )}
+                        </div>
+                      
                       </div>
                     ))
                   )}
@@ -853,15 +1249,421 @@ export default function EnhancedMarkupCanvas({
                     </div>
                   </div>
                 )}
+
+
+
+                {/* 수정 관련 액션 버튼 */}
+                {!readonly && (markups.length > 0 || checklistItems.length > 0) && (
+                  <div className="mt-6 p-4 bg-base-100 border border-base-300 rounded-lg">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h4 className="font-semibold text-base">
+                          {userRole === 'client' ? '📤 수정 요청' : '👁️ 수정 검토'}
+                        </h4>
+                        <p className="text-sm text-base-content/60 mt-1">
+                          {userRole === 'client' 
+                            ? '작성한 마크업 피드백과 수정사항을 디자이너에게 전달합니다'
+                            : '클라이언트가 요청한 수정사항을 검토하고 승인/거절하세요'
+                          }
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 클라이언트용 제출 안내 */}
+                    {userRole === 'client' && (
+                      <div className="bg-warning/10 border border-warning/20 rounded-lg p-3 mb-4">
+                        <div className="flex items-start gap-2">
+                          <span className="text-warning text-sm">⚠️</span>
+                          <div className="text-sm">
+                            <p className="font-medium">제출 시 수정 횟수가 즉시 차감됩니다</p>
+                            <p className="text-base-content/60 text-xs mt-1">
+                              디자이너가 거절할 경우 수정 횟수가 복구됩니다
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 디자이너용 종합 체크리스트 */}
+                    {userRole === 'designer' && (
+                      <div className="space-y-4 mb-4">
+                        {/* 마크업 피드백 목록 */}
+                        {markups.length > 0 && (
+                          <div>
+                            <h5 className="font-medium mb-3 text-base">🎯 마크업 피드백 ({markups.length}개)</h5>
+                            <div className="space-y-2">
+                              {markups.map((markup) => {
+                                const feedback = feedbacks.find(f => f.id === markup.feedback_id);
+                                return (
+                                  <div key={markup.id} className="flex items-start gap-3 p-3 bg-base-50 rounded border">
+                                    <input type="checkbox" className="checkbox checkbox-sm mt-1" />
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <span className="font-medium">마크업 #{markup.number}</span>
+                                        <span className="badge badge-info badge-sm">{markup.type}</span>
+                                      </div>
+                                      {feedback && (
+                                        <div className="text-sm">
+                                          <p className="font-medium">{feedback.title}</p>
+                                          {feedback.description && (
+                                            <p className="text-base-content/70 mt-1">{feedback.description}</p>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 체크리스트 항목들 */}
+                        {checklistItems.length > 0 && (
+                          <div>
+                            <h5 className="font-medium mb-3 text-base">📋 수정 체크리스트 ({checklistItems.length}개)</h5>
+                            <div className="space-y-2">
+                              {checklistItems.map((item) => (
+                                <div key={item.id} className="flex items-start gap-3 p-3 bg-base-50 rounded border">
+                                  <input type="checkbox" className="checkbox checkbox-sm mt-1" />
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="font-medium">{item.content}</span>
+                                      <span className={`badge badge-sm ${
+                                        item.priority === 'high' ? 'badge-error' :
+                                        item.priority === 'medium' ? 'badge-warning' :
+                                        'badge-info'
+                                      }`}>
+                                        {item.priority === 'high' ? '높음' : 
+                                         item.priority === 'medium' ? '보통' : '낮음'}
+                                      </span>
+                                    </div>
+                                    {item.description && (
+                                      <p className="text-sm text-base-content/70">{item.description}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 액션 버튼들 */}
+                    <div className="flex gap-3">
+                      {userRole === 'client' ? (
+                        <button
+                          onClick={handleSubmitModificationRequest}
+                          className="btn btn-primary flex-1"
+                          disabled={markups.length === 0 && checklistItems.length === 0}
+                        >
+                          🚀 수정 요청 제출하기
+                        </button>
+                      ) : (
+                        <>
+                          <button 
+                            className="btn btn-success flex-1"
+                            onClick={handleApproveModificationRequest}
+                          >
+                            ✅ 승인
+                          </button>
+                          <button 
+                            className="btn btn-warning flex-1"
+                            onClick={handleRejectModificationRequest}
+                          >
+                            💬 질문 및 역제안
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
+          )}
+
+          {/* 디자이너용 종합 검토 컨테이너 */}
+          {userRole === 'designer' && (
+            generalFeedbacks.filter(f => !f.isArchived).length > 0 || 
+            markups.filter(m => !m.isArchived).length > 0 || 
+            checklistItems.filter(item => !item.completed && !item.isCompleted).length > 0
+          ) && (
+            <div className="card bg-base-100 shadow-sm">
+              <div className="card-body p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-medium">📋 종합 검토 리스트</h4>
+                  <div className="flex items-center gap-2">
+                    <div className="badge badge-info badge-sm">
+                      총 {
+                        generalFeedbacks.filter(f => !f.isArchived).length + 
+                        markups.filter(m => !m.isArchived).length + 
+                        checklistItems.filter(item => !item.completed && !item.isCompleted).length
+                      }개 항목
+                    </div>
+                    <div className={`badge badge-sm ${remainingRevisions > 0 ? 'badge-success' : 'badge-error'}`}>
+                      수정 {remainingRevisions}/{totalRevisions}회 남음
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  {/* 일반 피드백 항목들 */}
+                  {generalFeedbacks.filter(f => !f.isArchived).length > 0 && (
+                    <div>
+                      <h5 className="font-medium text-sm text-primary mb-3">💬 일반 피드백 ({generalFeedbacks.filter(f => !f.isArchived).length}개)</h5>
+                      <div className="space-y-2">
+                        {generalFeedbacks.filter(f => !f.isArchived).map((feedback) => {
+                          const isExpanded = expandedFeedbacks.has(feedback.id);
+                          
+                          return (
+                            <div key={feedback.id} className="bg-base-50 rounded border">
+                              {/* 헤더 (항상 보임) */}
+                              <div 
+                                className="flex items-center gap-3 p-3 cursor-pointer hover:bg-base-100 transition-colors"
+                                onClick={() => toggleFeedbackExpansion(feedback.id)}
+                              >
+                                <input 
+                                  type="checkbox" 
+                                  className="checkbox checkbox-sm" 
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                                <div className="flex-1 flex items-center gap-2 min-w-0">
+                                  <span className="font-medium text-sm flex-shrink-0">피드백 #{feedback.id.split('-')[1]}</span>
+                                  <span className="badge badge-info badge-xs flex-shrink-0">{feedback.category}</span>
+                                  <span className="font-medium text-sm truncate flex-1 min-w-0">{feedback.content}</span>
+                                </div>
+                                <div className={`text-base-content/50 transition-transform duration-300 ease-in-out flex-shrink-0 w-4 h-4 flex items-center justify-center ${
+                                  isExpanded ? 'rotate-90' : 'rotate-0'
+                                }`}>
+                                  ▶
+                                </div>
+                              </div>
+                              
+                              {/* 상세 내용 (접혔다 펼쳐짐) */}
+                              <div 
+                                className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                                  isExpanded ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'
+                                }`}
+                              >
+                                <div className="px-3 pb-3 border-t border-base-200">
+                                  <div className="mt-3">
+                                    {feedback.content_html && (
+                                      <div className="mb-3">
+                                        <p className="text-sm text-base-content/80" 
+                                           dangerouslySetInnerHTML={{ __html: feedback.content_html }} />
+                                      </div>
+                                    )}
+                                    <div className="flex items-center gap-2 mb-3">
+                                      <span className={`badge badge-sm ${
+                                        feedback.priority === 'high' ? 'badge-error' :
+                                        feedback.priority === 'medium' ? 'badge-warning' :
+                                        'badge-success'
+                                      }`}>
+                                        {feedback.priority}
+                                      </span>
+                                      <span className="badge badge-sm badge-neutral">
+                                        {feedback.category}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* 일반 피드백 댓글 섹션 */}
+                                  <div className="border-t border-base-200 pt-3">
+                                    <MarkupComments 
+                                      markupId={feedback.id}
+                                      onCommentCountChange={handleCommentChange}
+                                      onResolveStatusChange={handleCommentChange}
+                                      isDesigner={userRole === 'designer'}
+                                      projectId={projectId}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 마크업 피드백 항목들 */}
+                  {markups.filter(m => !m.isArchived).length > 0 && (
+                    <div>
+                      <h5 className="font-medium text-sm text-primary mb-3">🎯 마크업 피드백 ({markups.filter(m => !m.isArchived).length}개)</h5>
+                      <div className="space-y-2">
+                        {markups.filter(m => !m.isArchived).map((markup) => {
+                          const feedback = feedbacks.find(f => f.id === markup.feedback_id);
+                          const isExpanded = expandedMarkups.has(markup.id);
+                          
+                          return (
+                            <div key={markup.id} className="bg-base-50 rounded border">
+                              {/* 헤더 (항상 보임) */}
+                              <div 
+                                className="flex items-center gap-3 p-3 cursor-pointer hover:bg-base-100 transition-colors"
+                                onClick={() => toggleMarkupExpansion(markup.id)}
+                              >
+                                <input 
+                                  type="checkbox" 
+                                  className="checkbox checkbox-sm" 
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                                <div className="flex-1 flex items-center gap-2 min-w-0">
+                                  <span className="font-medium text-sm flex-shrink-0">마크업 #{markup.number}</span>
+                                  <span className="badge badge-info badge-xs flex-shrink-0">{markup.type}</span>
+                                  {feedback && (
+                                    <span className="font-medium text-sm truncate flex-1 min-w-0">{feedback.title}</span>
+                                  )}
+                                </div>
+                                <div className={`text-base-content/50 transition-transform duration-300 ease-in-out flex-shrink-0 w-4 h-4 flex items-center justify-center ${
+                                  isExpanded ? 'rotate-90' : 'rotate-0'
+                                }`}>
+                                  ▶
+                                </div>
+                              </div>
+                              
+                              {/* 상세 내용 (접혔다 펼쳐짐) */}
+                              <div 
+                                className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                                  isExpanded ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'
+                                }`}
+                              >
+                                <div className="px-3 pb-3 border-t border-base-200">
+                                  {feedback && (
+                                    <div className="mt-3">
+                                      {feedback.description && (
+                                        <div className="mb-3">
+                                          <p className="text-sm text-base-content/80">{feedback.description}</p>
+                                        </div>
+                                      )}
+                                      <div className="flex items-center gap-2 mb-3">
+                                        <span className={`badge badge-sm ${
+                                          feedback.priority === 'high' ? 'badge-error' :
+                                          feedback.priority === 'medium' ? 'badge-warning' :
+                                          'badge-success'
+                                        }`}>
+                                          {feedback.priority}
+                                        </span>
+                                        <span className="badge badge-sm badge-neutral">
+                                          {FEEDBACK_CATEGORIES.find(c => c.value === feedback.category)?.label}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {/* 마크업 댓글 섹션 */}
+                                  <div className="border-t border-base-200 pt-3">
+                                    <MarkupComments 
+                                      markupId={markup.id}
+                                      onCommentCountChange={handleCommentChange}
+                                      onResolveStatusChange={handleCommentChange}
+                                      isDesigner={userRole === 'designer'}
+                                      projectId={projectId}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 체크리스트 항목들 */}
+                  {checklistItems.filter(item => !item.completed && !item.isCompleted).length > 0 && (
+                    <div>
+                      <h5 className="font-medium text-sm text-primary mb-3">📝 수정 체크리스트 ({checklistItems.filter(item => !item.completed && !item.isCompleted).length}개)</h5>
+                      <div className="space-y-2">
+                        {checklistItems.filter(item => !item.completed && !item.isCompleted || item.isRevisionHeader).map((item) => (
+                          <div key={item.id}>
+                            {/* 차수 헤더인 경우 특별한 스타일 */}
+                            {item.isRevisionHeader ? (
+                              <div className="mb-4 mt-6 first:mt-0">
+                                <div className="flex items-center gap-3 p-4 bg-primary/10 border-l-4 border-primary rounded">
+                                  <div className="text-2xl">📋</div>
+                                  <div className="flex-1">
+                                    <h4 className="font-bold text-lg text-primary">{item.content}</h4>
+                                    <p className="text-sm text-base-content/70 mt-1">{item.description}</p>
+                                  </div>
+                                  <div className="badge badge-primary">
+                                    {item.revisionNumber}회차
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              /* 일반 체크리스트 아이템 */
+                              <div className="flex items-start gap-3 p-3 bg-base-50 rounded border mb-2">
+                                <input 
+                                  type="checkbox" 
+                                  className="checkbox checkbox-sm mt-1" 
+                                  checked={item.completed || item.isCompleted}
+                                  readOnly
+                                />
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="font-medium text-sm">{item.content}</span>
+                                    <span className={`badge badge-xs ${
+                                      item.type === 'markup' ? 'badge-primary' : 'badge-secondary'
+                                    }`}>
+                                      {item.type === 'markup' ? '마크업' : '수동'}
+                                    </span>
+                                    <span className={`badge badge-xs ${
+                                      item.priority === 'high' ? 'badge-error' :
+                                      item.priority === 'medium' ? 'badge-warning' :
+                                      'badge-info'
+                                    }`}>
+                                      {item.priority === 'high' ? '높음' : 
+                                       item.priority === 'medium' ? '보통' : '낮음'}
+                                    </span>
+                                  </div>
+                                  {item.description && (
+                                    <p className="text-xs text-base-content/70">{item.description}</p>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 종합 검토 완료 액션 버튼 */}
+                <div className="mt-6 pt-4 border-t border-base-200">
+                  <div className="flex flex-col sm:flex-row gap-3 justify-end">
+                    <button 
+                      className="btn btn-success"
+                      onClick={handleApprovalAndCreateNewRevision}
+                    >
+                      ✅ 검토 승인
+                    </button>
+                    <button 
+                      className="btn btn-outline btn-warning"
+                      onClick={() => {
+                        // TODO: 재검토 요청 로직
+                        console.log('재검토 요청');
+                        alert('재검토 요청이 클라이언트에게 전송되었습니다.');
+                      }}
+                    >
+                      🔄 재검토 요청
+                    </button>
+                  </div>
+                  <p className="text-xs text-base-content/60 mt-2 text-right">
+                    모든 피드백을 검토한 후 최종 결정을 내려주세요
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
         </div>
       </div>
 
-      {/* 피드백 작성/편집 모달 */}
-      {showFeedbackForm && selectedMarkup && !readonly && (
+      {/* 피드백 작성/편집 모달 (클라이언트만) */}
+      {showFeedbackForm && selectedMarkup && !readonly && userRole === 'client' && (
         <div className="modal modal-open">
           <div className="modal-box">
             <h3 className="font-bold text-lg mb-4">
@@ -1053,7 +1855,7 @@ export default function EnhancedMarkupCanvas({
       )}
 
       {/* 체크리스트 항목 추가 모달 */}
-      {showChecklistForm && !readonly && (
+      {showChecklistForm && !readonly && userRole === 'client' && (
         <div className="modal modal-open">
           <div className="modal-box">
             <h3 className="font-bold text-lg mb-4">새 수정사항 추가</h3>

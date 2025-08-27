@@ -6,6 +6,7 @@ import { MarkupManager } from "@/lib/markupManager";
 import ImageMarkupCanvasWrapper from "./ImageMarkupCanvasWrapper";
 import MarkupToolbar from "./MarkupToolbar";
 import FeedbackModal from "./FeedbackModal";
+import MarkupComments from "./MarkupComments";
 
 interface MarkupFeedbackSystemProps {
   version: DesignVersion;
@@ -29,14 +30,17 @@ export default function MarkupFeedbackSystem({
   const [selectedMarkup, setSelectedMarkup] = useState<ImageMarkup | null>(null);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [editingFeedback, setEditingFeedback] = useState<MarkupFeedback | null>(null);
+  const [commentStats, setCommentStats] = useState(MarkupManager.getVersionCommentStats(version.id));
 
   // 데이터 로드
   const loadData = useCallback(() => {
     const versionMarkups = MarkupManager.getVersionMarkups(version.id);
     const versionFeedbacks = MarkupManager.getVersionMarkupFeedbacks(version.id);
+    const versionCommentStats = MarkupManager.getVersionCommentStats(version.id);
     
     setMarkups(versionMarkups);
     setFeedbacks(versionFeedbacks);
+    setCommentStats(versionCommentStats);
   }, [version.id]);
 
   useEffect(() => {
@@ -146,6 +150,10 @@ export default function MarkupFeedbackSystem({
   }, []);
 
   const stats = MarkupManager.getMarkupStats(version.id);
+  
+  const handleCommentChange = useCallback(() => {
+    loadData(); // 댓글 변경 시 전체 데이터 다시 로드
+  }, [loadData]);
 
   return (
     <div className="space-y-6">
@@ -169,8 +177,12 @@ export default function MarkupFeedbackSystem({
             <div className="stat-value text-secondary">{stats.total_feedbacks}</div>
           </div>
           <div className="stat">
+            <div className="stat-title">댓글</div>
+            <div className="stat-value text-accent">{commentStats.total_comments}</div>
+          </div>
+          <div className="stat">
             <div className="stat-title">미해결</div>
-            <div className="stat-value text-warning">{stats.pending_feedbacks + stats.in_progress_feedbacks}</div>
+            <div className="stat-value text-warning">{stats.pending_feedbacks + stats.in_progress_feedbacks + commentStats.unresolved_comments}</div>
           </div>
         </div>
       </div>
@@ -247,18 +259,45 @@ export default function MarkupFeedbackSystem({
                         <p className="text-sm text-base-content/70 mt-1 line-clamp-2">
                           {feedback.description}
                         </p>
+                        
+                        {/* 댓글 표시 */}
+                        {markup && (
+                          <div className="mt-2">
+                            <span className="text-xs text-base-content/60 flex items-center gap-1">
+                              💬 {markup.comment_count || 0}개 댓글
+                              {markup.has_unresolved_comments && (
+                                <span className="badge badge-error badge-xs">미해결</span>
+                              )}
+                            </span>
+                          </div>
+                        )}
                       </div>
                       
-                      <div className={`badge ${
-                        feedback.status === 'resolved' ? 'badge-success' :
-                        feedback.status === 'in_progress' ? 'badge-warning' :
-                        feedback.status === 'rejected' ? 'badge-error' : 'badge-info'
-                      }`}>
-                        {feedback.status === 'resolved' ? '✅ 해결' :
-                         feedback.status === 'in_progress' ? '⏳ 진행중' :
-                         feedback.status === 'rejected' ? '❌ 거절' : '⏸️ 대기'}
+                      <div className="flex flex-col items-end gap-2">
+                        <div className={`badge ${
+                          feedback.status === 'resolved' ? 'badge-success' :
+                          feedback.status === 'in_progress' ? 'badge-warning' :
+                          feedback.status === 'rejected' ? 'badge-error' : 'badge-info'
+                        }`}>
+                          {feedback.status === 'resolved' ? '✅ 해결' :
+                           feedback.status === 'in_progress' ? '⏳ 진행중' :
+                           feedback.status === 'rejected' ? '❌ 거절' : '⏸️ 대기'}
+                        </div>
                       </div>
                     </div>
+                    
+                    {/* 마크업별 댓글 섹션 */}
+                    {markup && (
+                      <div className="mt-4 border-t border-base-200 pt-4">
+                        <MarkupComments 
+                          markupId={markup.id}
+                          onCommentCountChange={handleCommentChange}
+                          onResolveStatusChange={handleCommentChange}
+                          isDesigner={userRole === 'designer'}
+                          projectId={projectId}
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               })}

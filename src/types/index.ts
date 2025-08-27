@@ -379,7 +379,7 @@ export interface ModificationRequest {
   project_id: string;
   request_number: number; // 1, 2, 3...
   feedback_ids: string[]; // 이 수정요청에 포함된 피드백들
-  status: "pending" | "approved" | "in_progress" | "completed" | "rejected";
+  status: "pending" | "clarification_needed" | "approved" | "in_progress" | "completed" | "rejected";
   requested_at: string;
   approved_at?: string;
   completed_at?: string;
@@ -390,9 +390,113 @@ export interface ModificationRequest {
   requested_by: string; // 요청자 ID
   approved_by?: string; // 승인자 ID
   rejection_reason?: string; // 거절 사유
+  clarification_requests?: ClarificationRequest[]; // 세부 설명 재요청 목록
   is_additional_cost: boolean; // 추가 비용 발생 여부
   additional_cost_amount?: number; // 추가 비용 금액
   notes?: string; // 추가 메모
+  rejected_at?: string; // 거절 시간
+  work_progress?: WorkProgress; // 작업 진행 상황
+}
+
+// 세부 설명 재요청 타입
+export interface ClarificationRequest {
+  id: string;
+  modification_request_id: string;
+  feedback_id: string; // 어떤 피드백에 대한 재요청인지
+  question: string; // 디자이너의 질문
+  response?: string; // 클라이언트의 답변
+  status: "pending" | "answered" | "resolved";
+  requested_by: string; // 디자이너 ID
+  requested_at: string;
+  answered_at?: string;
+  resolved_at?: string;
+}
+
+// 작업 진행 상황 타입
+export interface WorkProgress {
+  modification_request_id: string;
+  checklist_items: WorkChecklistItem[];
+  overall_progress: number; // 0-100 전체 진행률
+  estimated_completion: string; // 예상 완료일
+  actual_start_date?: string; // 실제 시작일
+  status: "not_started" | "in_progress" | "review_ready" | "completed";
+  last_updated: string;
+  notes?: string; // 진행 상황 메모
+}
+
+export interface WorkChecklistItem {
+  id: string;
+  title: string; // 작업 제목
+  description?: string; // 상세 설명
+  category: "design" | "development" | "review" | "delivery" | "other";
+  priority: "low" | "medium" | "high" | "critical";
+  status: "pending" | "in_progress" | "completed" | "blocked" | "skipped";
+  progress_percentage: number; // 0-100 개별 진행률
+  estimated_hours?: number; // 예상 소요 시간
+  actual_hours?: number; // 실제 소요 시간
+  assigned_to?: string; // 담당자 (대개 디자이너)
+  dependencies?: string[]; // 의존성 있는 다른 체크리스트 아이템
+  started_at?: string;
+  completed_at?: string;
+  blocked_reason?: string; // 차단 사유
+  notes?: string; // 작업 메모
+  attachments?: WorkAttachment[]; // 체크리스트 항목 관련 파일
+  time_logs?: WorkTimeLog[]; // 시간 기록
+  comment_count?: number; // 댓글 수
+  has_unresolved_comments?: boolean; // 미해결 댓글이 있는지
+}
+
+export interface WorkAttachment {
+  id: string;
+  filename: string;
+  file_type: string;
+  file_size: number;
+  file_url: string;
+  description?: string;
+  uploaded_at: string;
+  uploaded_by: string;
+}
+
+export interface WorkTimeLog {
+  id: string;
+  checklist_item_id: string;
+  start_time: string;
+  end_time?: string;
+  duration_minutes?: number;
+  description?: string;
+  work_type: "design" | "development" | "review" | "communication" | "other";
+  logged_by: string;
+  logged_at: string;
+}
+
+// 진행 상황 업데이트 이벤트
+export interface ProgressUpdateEvent {
+  id: string;
+  modification_request_id: string;
+  checklist_item_id?: string;
+  event_type: "started" | "progress_updated" | "completed" | "blocked" | "note_added" | "file_attached";
+  description: string;
+  old_value?: any;
+  new_value?: any;
+  created_by: string;
+  created_at: string;
+}
+
+// 피드백 명확성 평가 타입
+export interface FeedbackClarityAssessment {
+  feedback_id: string;
+  is_clear: boolean;
+  clarity_score: number; // 1-5 점
+  issues: ClarityIssue[];
+  suggestions?: string; // 개선 제안
+  assessed_by: string; // 디자이너 ID
+  assessed_at: string;
+}
+
+export interface ClarityIssue {
+  type: "vague" | "missing_details" | "conflicting" | "technical_unclear" | "reference_needed";
+  description: string;
+  suggestion?: string;
 }
 
 // 수정 기록 타입
@@ -482,6 +586,8 @@ export interface ImageMarkup {
   created_by: string;
   color?: string; // 마크업 색상
   size?: number; // 마크업 크기
+  comment_count?: number; // 댓글 수
+  has_unresolved_comments?: boolean; // 미해결 댓글이 있는지
 }
 
 export type MarkupType = 'point' | 'circle' | 'arrow' | 'rectangle' | 'text' | 'freehand';
@@ -523,11 +629,14 @@ export interface ChecklistItem {
   referenceUrls?: string[]; // 레퍼런스 URL 목록
   referenceFiles?: FeedbackFile[]; // 첨부 파일 목록
   isCompleted: boolean;
+  completed: boolean; // 호환성을 위한 필드
   createdAt: string;
   updatedAt: string;
   priority: 'low' | 'medium' | 'high';
-  type: 'markup' | 'general'; // 마크업 피드백에서 자동 생성 vs 직접 추가
+  type: 'markup' | 'general' | 'manual'; // 마크업 피드백에서 자동 생성 vs 직접 추가
   markupFeedbackId?: string; // 마크업 피드백과 연결된 경우
+  isRevisionHeader?: boolean; // 차수 구분 헤더인지 여부
+  revisionNumber?: number; // 몇 차수인지
 }
 
 export type FeedbackCategory = 
@@ -553,6 +662,36 @@ export interface MarkupTool {
   label: string;
   description: string;
   color: string;
+}
+
+// 마크업 댓글 타입
+export interface MarkupComment {
+  id: string;
+  markup_id: string;          // 어떤 마크업에 대한 댓글인지
+  author_id: string;
+  author_name: string;
+  author_role: "client" | "designer";
+  content: string;
+  created_at: string;
+  parent_id?: string;         // 대댓글의 경우 부모 댓글 ID
+  is_resolved?: boolean;      // 댓글이 해결되었는지 여부
+  resolved_at?: string;       // 해결된 시간
+  resolved_by?: string;       // 해결한 사람
+}
+
+// 체크리스트 댓글 타입 (마크업 댓글과 동일하지만 다른 대상)
+export interface ChecklistComment {
+  id: string;
+  checklist_item_id: string;  // 어떤 체크리스트 항목에 대한 댓글인지
+  author_id: string;
+  author_name: string;
+  author_role: "client" | "designer";
+  content: string;
+  created_at: string;
+  parent_id?: string;         // 대댓글의 경우 부모 댓글 ID
+  is_resolved?: boolean;      // 댓글이 해결되었는지 여부
+  resolved_at?: string;       // 해결된 시간
+  resolved_by?: string;       // 해결한 사람
 }
 
 // API 응답 타입
@@ -706,4 +845,44 @@ export interface AnnouncementFormData {
   allow_comments: boolean;
   send_push: boolean;
   send_email: boolean;
+}
+
+// 일반 사용자용 공지사항 타입 (간소화된 버전)
+export interface UserAnnouncement {
+  id: string;
+  title: string;
+  content: string;
+  content_html: string;
+  category: AnnouncementCategory;
+  priority: "normal" | "important" | "urgent";
+  
+  // 메타데이터
+  created_at: string;
+  updated_at: string;
+  published_at: string;
+  
+  // 사용자 관련
+  is_read: boolean;
+  read_at?: string;
+  
+  // 표시 옵션
+  is_pinned: boolean;
+}
+
+// 공지사항 카테고리
+export type AnnouncementCategory = 
+  | "general" // 일반 공지사항
+  | "update" // 업데이트/점검
+  | "policy" // 정책/약관 변경
+  | "event"; // 이벤트/프로모션
+
+// 공지사항 필터 타입
+export interface AnnouncementFilter {
+  category?: AnnouncementCategory;
+  priority?: "normal" | "important" | "urgent";
+  read_status?: "all" | "read" | "unread";
+  date_range?: {
+    start: string;
+    end: string;
+  };
 }
