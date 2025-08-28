@@ -632,9 +632,12 @@ export interface ChecklistItem {
   completed: boolean; // 호환성을 위한 필드
   createdAt: string;
   updatedAt: string;
+  completedAt?: string; // 완료 시간
   priority: 'low' | 'medium' | 'high';
   type: 'markup' | 'general' | 'manual'; // 마크업 피드백에서 자동 생성 vs 직접 추가
   markupFeedbackId?: string; // 마크업 피드백과 연결된 경우
+  markupId?: string; // 마크업 자체와 연결된 경우 (피드백 없음)
+  generalFeedbackId?: string; // 일반 피드백과 연결된 경우
   isRevisionHeader?: boolean; // 차수 구분 헤더인지 여부
   revisionNumber?: number; // 몇 차수인지
 }

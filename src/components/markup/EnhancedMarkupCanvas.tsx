@@ -232,47 +232,105 @@ export default function EnhancedMarkupCanvas({
     // 승인된 마크업과 일반 피드백을 체크리스트에 추가 (아직 체크리스트에 없는 경우)
     const additionalChecklistItems: ChecklistItem[] = [];
     
-    // 마크업 피드백을 체크리스트에 추가
-    markups.forEach(markup => {
-      const markupFeedback = feedbacks.find(f => f.id === markup.feedback_id);
-      if (markupFeedback) {
-        const existingItem = checklistItems.find(item => item.markupFeedbackId === markup.feedback_id);
+    // 디버깅 로그
+    console.log('🔍 handleApprovalAndCreateNewRevision 디버깅:');
+    console.log('- markups:', markups);
+    console.log('- feedbacks:', feedbacks);
+    console.log('- generalFeedbacks:', generalFeedbacks);
+    console.log('- checklistItems:', checklistItems);
+    
+    const activeMarkups = markups.filter(m => !m.isArchived);
+    const activeGeneralFeedbacks = generalFeedbacks.filter(f => !f.isArchived);
+    
+    console.log('- activeMarkups:', activeMarkups);
+    console.log('- activeGeneralFeedbacks:', activeGeneralFeedbacks);
+    
+    // 마크업 피드백을 체크리스트에 추가 (아카이브되지 않은 것만)
+    activeMarkups.forEach(markup => {
+      console.log(`🎯 마크업 처리 중: markup.id=${markup.id}, feedback_id=${markup.feedback_id}`);
+      
+      // 마크업에 연결된 피드백이 있는 경우
+      if (markup.feedback_id) {
+        const markupFeedback = feedbacks.find(f => f.id === markup.feedback_id);
+        console.log(`- 찾은 마크업 피드백:`, markupFeedback);
+        if (markupFeedback) {
+          const existingItem = checklistItems.find(item => 
+            item.markupFeedbackId === markup.feedback_id ||
+            item.markupFeedbackId === markupFeedback.id
+          );
+          console.log(`- 기존 항목 존재:`, !!existingItem);
+          if (!existingItem) {
+            const newItem = {
+              id: `markup-new-${markupFeedback.id}`,
+              content: markupFeedback.title || `마크업 #${markup.number}`,
+              completed: false,
+              isCompleted: false,
+              createdAt: markupFeedback.created_at,
+              updatedAt: new Date().toISOString(),
+              priority: markupFeedback.priority || 'medium',
+              type: 'markup',
+              markupFeedbackId: markupFeedback.id,
+              revisionNumber: currentRevisionNumber
+            };
+            additionalChecklistItems.push(newItem);
+            console.log(`✅ 마크업 체크리스트 항목 추가:`, newItem);
+          }
+        }
+      } else {
+        // 마크업에 연결된 피드백이 없는 경우 마크업 자체를 체크리스트에 추가
+        const existingItem = checklistItems.find(item => 
+          item.markupId === markup.id || 
+          item.content === `마크업 #${markup.number}`
+        );
+        console.log(`- 피드백 없는 마크업, 기존 항목 존재:`, !!existingItem);
         if (!existingItem) {
-          additionalChecklistItems.push({
-            id: `markup-completed-${markupFeedback.id}`,
-            content: markupFeedback.title,
-            completed: true,
-            isCompleted: true,
-            createdAt: markupFeedback.created_at,
+          const newItem = {
+            id: `markup-new-${markup.id}`,
+            content: `마크업 #${markup.number}`,
+            completed: false,
+            isCompleted: false,
+            createdAt: markup.created_at || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
-            completedAt: new Date().toISOString(),
-            priority: markupFeedback.priority,
+            priority: 'medium',
             type: 'markup',
-            markupFeedbackId: markupFeedback.id,
+            markupId: markup.id,
             revisionNumber: currentRevisionNumber
-          });
+          };
+          additionalChecklistItems.push(newItem);
+          console.log(`✅ 피드백 없는 마크업 체크리스트 항목 추가:`, newItem);
         }
       }
     });
     
     // 일반 피드백을 체크리스트에 추가
-    generalFeedbacks.forEach(feedback => {
-      const existingItem = checklistItems.find(item => item.content === feedback.content);
+    activeGeneralFeedbacks.forEach(feedback => {
+      console.log(`💬 일반 피드백 처리 중: feedback.id=${feedback.id}, title=${feedback.title}`);
+      // 일반 피드백 ID로 기존 항목을 찾거나 title로 매칭
+      const existingItem = checklistItems.find(item => 
+        item.generalFeedbackId === feedback.id || 
+        item.content === feedback.title
+      );
+      console.log(`- 기존 항목 존재:`, !!existingItem);
       if (!existingItem) {
-        additionalChecklistItems.push({
-          id: `general-completed-${feedback.id}`,
-          content: feedback.content,
-          completed: true,
-          isCompleted: true,
+        const newItem = {
+          id: `general-new-${feedback.id}`,
+          content: feedback.title || feedback.content, // title이 있으면 title, 없으면 content
+          completed: false,
+          isCompleted: false,
           createdAt: feedback.submitted_at,
           updatedAt: new Date().toISOString(),
-          completedAt: new Date().toISOString(),
           priority: feedback.priority,
           type: 'general',
+          generalFeedbackId: feedback.id, // 일반 피드백 ID 추가
           revisionNumber: currentRevisionNumber
-        });
+        };
+        additionalChecklistItems.push(newItem);
+        console.log(`✅ 일반 피드백 체크리스트 항목 추가:`, newItem);
       }
     });
+    
+    console.log(`📋 추가될 체크리스트 항목 수: ${additionalChecklistItems.length}`);
+    console.log('추가될 항목들:', additionalChecklistItems);
     
     // 체크리스트 업데이트: 기존 항목들을 완료 상태로 + 추가 항목들 + 새로운 차수 헤더 추가
     setChecklistItems([...completedChecklistItems, ...additionalChecklistItems, newRevisionHeader]);
@@ -1636,7 +1694,10 @@ export default function EnhancedMarkupCanvas({
                   <div className="flex flex-col sm:flex-row gap-3 justify-end">
                     <button 
                       className="btn btn-success"
-                      onClick={handleApprovalAndCreateNewRevision}
+                      onClick={() => {
+                        console.log('🔴 검토 승인 버튼 클릭됨!');
+                        handleApprovalAndCreateNewRevision();
+                      }}
                     >
                       ✅ 검토 승인
                     </button>
