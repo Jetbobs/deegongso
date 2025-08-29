@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { DesignVersion, VersionComparison } from "@/types";
 import { VersionManager } from "@/lib/versionManager";
 
@@ -81,9 +82,11 @@ export default function VersionComparisonComponent({
         </div>
         
         <div className="bg-base-200 rounded-lg h-full flex items-center justify-center overflow-hidden">
-          <img
+          <Image
             src={version_a.files[selectedFileA]?.file_url}
             alt={`버전 ${version_a.version_number}`}
+            width={600}
+            height={400}
             className="max-w-full max-h-full object-contain"
           />
         </div>
@@ -119,9 +122,11 @@ export default function VersionComparisonComponent({
         </div>
         
         <div className="bg-base-200 rounded-lg h-full flex items-center justify-center overflow-hidden">
-          <img
+          <Image
             src={version_b.files[selectedFileB]?.file_url}
             alt={`버전 ${version_b.version_number}`}
+            width={600}
+            height={400}
             className="max-w-full max-h-full object-contain"
           />
         </div>
@@ -175,14 +180,18 @@ export default function VersionComparisonComponent({
       </div>
 
       <div className="relative bg-base-200 rounded-lg h-[500px] flex items-center justify-center overflow-hidden">
-        <img
+        <Image
           src={version_a.files[selectedFileA]?.file_url}
           alt={`버전 ${version_a.version_number}`}
+          width={800}
+          height={500}
           className="absolute max-w-full max-h-full object-contain"
         />
-        <img
+        <Image
           src={version_b.files[selectedFileB]?.file_url}
           alt={`버전 ${version_b.version_number}`}
+          width={800}
+          height={500}
           className="absolute max-w-full max-h-full object-contain opacity-50"
         />
       </div>
@@ -214,9 +223,11 @@ export default function VersionComparisonComponent({
             className="absolute top-0 left-0 h-full overflow-hidden"
             style={{ width: `${sliderPosition}%` }}
           >
-            <img
+            <Image
               src={version_a.files[selectedFileA]?.file_url}
               alt={`버전 ${version_a.version_number}`}
+              width={800}
+              height={500}
               className="w-full h-full object-contain"
               style={{ width: `${100 * 100 / sliderPosition}%` }}
             />
@@ -227,9 +238,11 @@ export default function VersionComparisonComponent({
             className="absolute top-0 right-0 h-full overflow-hidden"
             style={{ width: `${100 - sliderPosition}%` }}
           >
-            <img
+            <Image
               src={version_b.files[selectedFileB]?.file_url}
               alt={`버전 ${version_b.version_number}`}
+              width={800}
+              height={500}
               className="w-full h-full object-contain"
               style={{ 
                 width: `${100 * 100 / (100 - sliderPosition)}%`,

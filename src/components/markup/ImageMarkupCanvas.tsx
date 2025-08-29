@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Stage, Layer, Image as KonvaImage, Circle, Rect, Text, Arrow, Line } from "react-konva";
-import { ImageMarkup, MarkupType, DesignVersion } from "@/types";
+import { ImageMarkup, MarkupType, DesignVersion, KonvaStage } from "@/types";
 import { MarkupManager } from "@/lib/markupManager";
 import { useImageWithFallback } from "@/hooks/useImageWithFallback";
 
@@ -28,7 +28,7 @@ export default function ImageMarkupCanvas({
   const [markups, setMarkups] = useState<ImageMarkup[]>([]);
   const [stageDimensions, setStageDimensions] = useState({ width: 800, height: 600 });
   const [imageScale, setImageScale] = useState({ x: 1, y: 1 });
-  const stageRef = useRef<any>(null);
+  const stageRef = useRef<KonvaStage | null>(null);
   
   // 첫 번째 파일의 이미지 로드 (여러 fallback URL 사용)
   const primaryUrl = version.files[0]?.file_url;
@@ -193,7 +193,7 @@ export default function ImageMarkupCanvas({
   }, [image]);
 
   // Stage 클릭 핸들러
-  const handleStageClick = (e: any) => {
+  const handleStageClick = (e: { target: { getStage: () => KonvaStage }; evt: MouseEvent }) => {
     // 마크업 모드가 아니거나 선택된 도구가 없으면 무시
     if (!isMarkupMode || !selectedTool) return;
 

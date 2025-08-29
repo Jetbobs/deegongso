@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Image from "next/image";
 import { ImageUtils } from "@/lib/versionManager";
 
 interface VersionUploadProps {
@@ -160,9 +161,11 @@ export default function VersionUpload({ onUpload, onCancel, isLoading }: Version
                 {selectedFiles.map((file, index) => (
                   <div key={index} className="relative group">
                     <div className="aspect-square bg-base-200 rounded-lg overflow-hidden">
-                      <img
+                      <Image
                         src={previews[index]}
                         alt={file.name}
+                        width={200}
+                        height={200}
                         className="w-full h-full object-cover"
                       />
                     </div>

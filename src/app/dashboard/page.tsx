@@ -10,6 +10,7 @@ import ProposalsDashboard from "@/components/dashboard/ProposalsDashboard";
 import PersonalStats from "@/components/dashboard/PersonalStats";
 import ActivityHistory from "@/components/dashboard/ActivityHistory";
 import PerformanceReports from "@/components/dashboard/PerformanceReports";
+import UserMarkupStatsComponent from "@/components/markup/UserMarkupStats";
 import { useToastActions } from "@/components/ui/Toast";
 import { ProjectNotifications } from "@/lib/pushNotifications";
 import {
@@ -613,6 +614,13 @@ export default function EnhancedDashboardPage() {
 
               {/* 차트 섹션 */}
               {showCharts && <DashboardCharts userRole={userRole} />}
+              
+              {/* 마크업 통계 */}
+              <UserMarkupStatsComponent 
+                userId={user?.id || ""} 
+                showDetailedStats={false}
+                className="mb-6"
+              />
               
               {/* 빠른 액션 */}
               <div className="card bg-base-100 shadow-sm">

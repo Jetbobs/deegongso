@@ -34,7 +34,7 @@ export default function ClientInputForm({
     client_notes: proposal.client_section?.client_notes || ""
   });
 
-  const updateClientData = (field: keyof typeof clientData, value: any) => {
+  const updateClientData = (field: keyof typeof clientData, value: string | boolean) => {
     setClientData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -82,7 +82,7 @@ export default function ClientInputForm({
         },
         budget_feedback: {
           is_acceptable: clientData.budget_acceptable,
-          counter_offer: clientData.counter_offer ? parseInt(clientData.counter_offer) : undefined,
+          counter_offer: clientData.counter_offer ? parseInt(String(clientData.counter_offer)) : undefined,
           budget_notes: clientData.budget_notes
         },
         additional_requests: clientData.additional_requests,

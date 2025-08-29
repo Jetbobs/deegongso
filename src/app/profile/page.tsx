@@ -5,6 +5,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { ClientUser, DesignerUser, UserRole } from "@/types";
 import { useAuth } from "@/hooks/useAuth";
 import AuthWrapper from "@/components/auth/AuthWrapper";
+import UserMarkupStatsComponent from "@/components/markup/UserMarkupStats";
 
 // 기본 사용자 정보들 (컴포넌트 외부로 이동)
 const DEFAULT_CLIENT_USER: ClientUser = {
@@ -300,6 +301,14 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
+
+          {/* 마크업 통계 */}
+          <UserMarkupStatsComponent 
+            userId={user?.id || displayUser.id} 
+            showDetailedStats={true}
+            showRecentActivity={true}
+            className="mb-6"
+          />
 
           {/* 최근 활동 */}
           <div className="card bg-base-100 shadow-sm">

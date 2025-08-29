@@ -117,9 +117,11 @@ export default function VersionList({
           {/* 이미지 */}
           <figure className="relative aspect-[4/3] bg-base-200">
             {version.files.length > 0 && (
-              <img
+              <Image
                 src={version.files[0].file_url}
                 alt={version.title || `버전 ${version.version_number}`}
+                width={400}
+                height={300}
                 className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -212,9 +214,11 @@ export default function VersionList({
               {/* 썸네일 */}
               <div className="w-16 h-12 bg-base-200 rounded overflow-hidden flex-shrink-0">
                 {version.files.length > 0 && (
-                  <img
+                  <Image
                     src={version.files[0].file_url}
                     alt={version.title || `버전 ${version.version_number}`}
+                    width={64}
+                    height={48}
                     className="w-full h-full object-cover"
                   />
                 )}
@@ -325,9 +329,11 @@ export default function VersionList({
               </button>
             </div>
             <div className="w-full">
-              <img
+              <Image
                 src={selectedImage.url}
                 alt={selectedImage.title}
+                width={800}
+                height={600}
                 className="w-full h-auto max-h-[70vh] object-contain"
               />
             </div>

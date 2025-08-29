@@ -2,12 +2,21 @@
 
 import { useState } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
+import { 
+  TimeRange, 
+  UserGrowthData, 
+  RevenueData, 
+  ProjectStatusData, 
+  TopDesignerData,
+  ChartTooltipProps,
+  ChartTooltipPayload
+} from "@/types";
 
 export default function AdminAnalytics() {
-  const [timeRange, setTimeRange] = useState<"week" | "month" | "quarter" | "year">("month");
+  const [timeRange, setTimeRange] = useState<TimeRange>("month");
 
   // Mock 데이터
-  const userGrowthData = [
+  const userGrowthData: UserGrowthData[] = [
     { month: "1월", clients: 45, designers: 32, total: 77 },
     { month: "2월", clients: 52, designers: 38, total: 90 },
     { month: "3월", clients: 61, designers: 45, total: 106 },
@@ -18,7 +27,7 @@ export default function AdminAnalytics() {
     { month: "8월", clients: 89, designers: 76, total: 165 }
   ];
 
-  const revenueData = [
+  const revenueData: RevenueData[] = [
     { month: "1월", revenue: 8500000, projects: 45 },
     { month: "2월", revenue: 9200000, projects: 52 },
     { month: "3월", revenue: 10800000, projects: 61 },
@@ -29,14 +38,14 @@ export default function AdminAnalytics() {
     { month: "8월", revenue: 12450000, projects: 76 }
   ];
 
-  const projectStatusData = [
+  const projectStatusData: ProjectStatusData[] = [
     { name: "완료", value: 324, color: "#10B981" },
     { name: "진행중", value: 89, color: "#F59E0B" },
     { name: "대기중", value: 23, color: "#6B7280" },
     { name: "취소", value: 12, color: "#EF4444" }
   ];
 
-  const topDesignersData = [
+  const topDesignersData: TopDesignerData[] = [
     { name: "김디자이너", projects: 45, revenue: 18500000, rating: 4.9 },
     { name: "이크리에이터", projects: 38, revenue: 15200000, rating: 4.8 },
     { name: "박아티스트", projects: 32, revenue: 12800000, rating: 4.7 },
@@ -52,12 +61,12 @@ export default function AdminAnalytics() {
     }).format(amount);
   };
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload, label }: ChartTooltipProps) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-white p-3 border border-gray-200 rounded-lg shadow">
           <p className="font-medium">{label}</p>
-          {payload.map((entry: any, index: number) => (
+          {payload.map((entry: ChartTooltipPayload, index: number) => (
             <p key={index} style={{ color: entry.color }}>
               {entry.dataKey}: {typeof entry.value === 'number' && entry.dataKey === 'revenue' 
                 ? formatCurrency(entry.value) 
@@ -77,7 +86,7 @@ export default function AdminAnalytics() {
         <div className="flex space-x-2">
           <select
             value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value as any)}
+            onChange={(e) => setTimeRange(e.target.value as TimeRange)}
             className="p-2 border border-gray-300 rounded-md"
           >
             <option value="week">최근 1주</option>

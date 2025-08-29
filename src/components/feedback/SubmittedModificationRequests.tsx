@@ -1,21 +1,21 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ChecklistItem } from '@/types';
+import { ChecklistItem, Feedback, ImageMarkup, MarkupFeedback, SubmittedModificationRequestData } from '@/types';
 import MarkupComments from '../markup/MarkupComments';
 
 interface SubmittedModificationRequestsProps {
   projectId: string;
   versionId: string;
   checklistItems: ChecklistItem[];
-  generalFeedbacks: any[];
-  markups: any[];
-  feedbacks: any[];
+  generalFeedbacks: Feedback[];
+  markups: ImageMarkup[];
+  feedbacks: MarkupFeedback[];
   userRole: 'client' | 'designer';
   currentRevisionNumber: number;
   totalRevisions: number;
   remainingRevisions: number;
-  submittedRequests?: any[]; // 검토 승인으로 생성된 제출된 수정요청들
+  submittedRequests?: SubmittedModificationRequestData[]; // 검토 승인으로 생성된 제출된 수정요청들
   onChecklistItemToggle?: (itemId: string, completed: boolean) => void;
 }
 
@@ -38,6 +38,19 @@ export default function SubmittedModificationRequests({
   
   // 디버깅: userRole 확인
   console.log('SubmittedModificationRequests userRole:', userRole);
+  console.log('🔍 SubmittedModificationRequests 데이터 디버깅:', {
+    submittedRequestsLength: submittedRequests.length,
+    submittedRequests: submittedRequests.map(req => ({
+      id: req.id,
+      itemsCount: {
+        markupFeedbacks: req.items.markupFeedbacks.length,
+        generalFeedbacks: req.items.generalFeedbacks.length,
+        checklistItems: req.items.checklistItems.length
+      },
+      totalItems: req.totalItems,
+      status: req.status
+    }))
+  });
   
   // 댓글 섹션 토글
   const toggleComments = (itemId: string) => {
@@ -191,13 +204,13 @@ export default function SubmittedModificationRequests({
                 <div key={request.id} className="border border-base-300 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <h5 className="font-medium text-lg">{request.title}</h5>
-                      <p className="text-sm text-base-content/70">{request.description}</p>
+                      <h5 className="font-medium text-lg">{request.title || `${request.revisionNumber}차 수정요청`}</h5>
+                      <p className="text-sm text-base-content/70">{request.description || '수정요청 항목들'}</p>
                     </div>
                     <div className="text-right">
-                      <div className="badge badge-success">{request.status}</div>
+                      <div className="badge badge-success">{request.status === 'approved' ? '승인됨' : request.status}</div>
                       <p className="text-xs text-base-content/60 mt-1">
-                        {new Date(request.approvedAt).toLocaleDateString('ko-KR')}
+                        {request.approvedAt ? new Date(request.approvedAt).toLocaleDateString('ko-KR') : new Date(request.submittedAt).toLocaleDateString('ko-KR')}
                       </p>
                     </div>
                   </div>
@@ -205,20 +218,20 @@ export default function SubmittedModificationRequests({
                   {/* 요약 정보 */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                     <div className="text-center p-2 bg-primary/10 rounded">
-                      <div className="text-lg font-bold text-primary">{request.summary.markupCount}</div>
+                      <div className="text-lg font-bold text-primary">{request.items.markupFeedbacks.length}</div>
                       <div className="text-xs text-base-content/70">마크업 피드백</div>
                     </div>
                     <div className="text-center p-2 bg-info/10 rounded">
-                      <div className="text-lg font-bold text-info">{request.summary.generalFeedbackCount}</div>
+                      <div className="text-lg font-bold text-info">{request.items.generalFeedbacks.length}</div>
                       <div className="text-xs text-base-content/70">일반 피드백</div>
                     </div>
                     <div className="text-center p-2 bg-secondary/10 rounded">
-                      <div className="text-lg font-bold text-secondary">{request.summary.checklistCount}</div>
+                      <div className="text-lg font-bold text-secondary">{request.items.checklistItems.length}</div>
                       <div className="text-xs text-base-content/70">체크리스트</div>
                     </div>
                     <div className="text-center p-2 bg-accent/10 rounded">
-                      <div className="text-lg font-bold text-accent">{request.summary.totalComments}</div>
-                      <div className="text-xs text-base-content/70">총 댓글</div>
+                      <div className="text-lg font-bold text-accent">{request.totalItems}</div>
+                      <div className="text-xs text-base-content/70">총 항목</div>
                     </div>
                   </div>
                   
@@ -226,7 +239,7 @@ export default function SubmittedModificationRequests({
                   <div className="collapse collapse-arrow border border-base-300">
                     <input type="checkbox" className="peer" />
                     <div className="collapse-title text-sm font-medium">
-                      상세 내용 보기 ({request.summary.totalItems}개 항목)
+                      상세 내용 보기 ({request.totalItems}개 항목)
                     </div>
                     <div className="collapse-content">
                       <div className="space-y-4">
@@ -238,23 +251,23 @@ export default function SubmittedModificationRequests({
                               {request.items.markupFeedbacks.map((item: any) => (
                                 <div key={item.id} className="bg-base-50 p-3 rounded border-l-4 border-primary">
                                   <div className="flex items-center gap-2 mb-2">
-                                    <span className="font-medium">마크업 #{item.markupNumber}</span>
-                                    <span className="badge badge-primary badge-xs">{item.markupType}</span>
+                                    <span className="font-medium">마크업 #{item.markupNumber || item.markup_number || 'N/A'}</span>
+                                    <span className="badge badge-primary badge-xs">{item.markupType || item.markup_type || item.category || '마크업'}</span>
                                     <span className={`badge badge-xs ${
                                       item.priority === 'high' ? 'badge-error' :
                                       item.priority === 'medium' ? 'badge-warning' : 'badge-success'
                                     }`}>
-                                      {item.priority}
+                                      {item.priority || 'medium'}
                                     </span>
                                   </div>
                                   
                                   {/* 제목 (중복 제거) */}
-                                  <h5 className="text-sm font-medium text-primary mb-1">{item.title}</h5>
+                                  <h5 className="text-sm font-medium text-primary mb-1">{item.title || item.content || '마크업 피드백'}</h5>
                                   
                                   {/* 설명 (HTML 태그 제거) */}
-                                  {item.description && (
+                                  {(item.description || item.content_html || item.content) && (
                                     <p className="text-sm text-base-content/70 mb-2">
-                                      {item.description.replace(/<[^>]*>/g, '')}
+                                      {(item.description || item.content_html || item.content || '').replace(/<[^>]*>/g, '')}
                                     </p>
                                   )}
                                   
@@ -289,7 +302,7 @@ export default function SubmittedModificationRequests({
                                       onClick={() => toggleComments(item.id)}
                                       className="text-xs text-primary hover:underline flex items-center gap-1"
                                     >
-                                      💬 댓글 {item.commentCount}개 
+                                      💬 댓글 {item.commentCount || 0}개 
                                       <span className={`transform transition-transform ${
                                         expandedComments.has(item.id) ? 'rotate-90' : ''
                                       }`}>
@@ -306,7 +319,7 @@ export default function SubmittedModificationRequests({
                                     <div className="mt-3 border-t border-base-200 pt-3">
                                       {item.comments && item.comments.length > 0 ? (
                                         <div className="space-y-2">
-                                          {item.comments.map((comment: any, commentIndex: number) => (
+                                          {item.comments.map((comment: { author: string; content: string; timestamp: string }, commentIndex: number) => (
                                             <div key={commentIndex} className="bg-white p-2 rounded border text-sm">
                                               <div className="flex items-center gap-2 mb-1">
                                                 <span className="font-medium">{comment.author || '익명'}</span>
@@ -342,22 +355,22 @@ export default function SubmittedModificationRequests({
                               {request.items.generalFeedbacks.map((item: any) => (
                                 <div key={item.id} className="bg-base-50 p-3 rounded border-l-4 border-info">
                                   <div className="flex items-center gap-2 mb-2">
-                                    <span className="badge badge-info badge-xs">{item.category}</span>
+                                    <span className="badge badge-info badge-xs">{item.category || '일반'}</span>
                                     <span className={`badge badge-xs ${
                                       item.priority === 'high' ? 'badge-error' :
                                       item.priority === 'medium' ? 'badge-warning' : 'badge-success'
                                     }`}>
-                                      {item.priority}
+                                      {item.priority || 'medium'}
                                     </span>
                                   </div>
                                   
                                   {/* 제목 */}
-                                  <h5 className="text-sm font-medium text-info mb-1">{item.title}</h5>
+                                  <h5 className="text-sm font-medium text-info mb-1">{item.title || item.content || '일반 피드백'}</h5>
                                   
                                   {/* 설명 (HTML 태그 제거) */}
-                                  {item.description && (
+                                  {(item.description || item.content_html || item.content) && (
                                     <div className="text-sm text-base-content/70 mb-2">
-                                      {item.description.replace(/<[^>]*>/g, '')}
+                                      {(item.description || item.content_html || item.content || '').replace(/<[^>]*>/g, '')}
                                     </div>
                                   )}
                                   
@@ -367,7 +380,7 @@ export default function SubmittedModificationRequests({
                                       onClick={() => toggleComments(item.id)}
                                       className="text-xs text-primary hover:underline flex items-center gap-1"
                                     >
-                                      💬 댓글 {item.commentCount}개 
+                                      💬 댓글 {item.commentCount || 0}개 
                                       <span className={`transform transition-transform ${
                                         expandedComments.has(item.id) ? 'rotate-90' : ''
                                       }`}>
@@ -384,7 +397,7 @@ export default function SubmittedModificationRequests({
                                     <div className="mt-3 border-t border-base-200 pt-3">
                                       {item.comments && item.comments.length > 0 ? (
                                         <div className="space-y-2">
-                                          {item.comments.map((comment: any, commentIndex: number) => (
+                                          {item.comments.map((comment: { author: string; content: string; timestamp: string }, commentIndex: number) => (
                                             <div key={commentIndex} className="bg-white p-2 rounded border text-sm">
                                               <div className="flex items-center gap-2 mb-1">
                                                 <span className="font-medium">{comment.author || '익명'}</span>
@@ -420,15 +433,15 @@ export default function SubmittedModificationRequests({
                               {request.items.checklistItems.map((item: any) => (
                                 <div key={item.id} className="bg-base-50 p-3 rounded border-l-4 border-secondary">
                                   <div className="flex items-center gap-2 mb-1">
-                                    <span className="badge badge-secondary badge-xs">{item.type}</span>
+                                    <span className="badge badge-secondary badge-xs">{item.type || '체크리스트'}</span>
                                     <span className={`badge badge-xs ${
                                       item.priority === 'high' ? 'badge-error' :
                                       item.priority === 'medium' ? 'badge-warning' : 'badge-success'
                                     }`}>
-                                      {item.priority}
+                                      {item.priority || 'medium'}
                                     </span>
                                   </div>
-                                  <p className="text-sm font-medium">{item.title}</p>
+                                  <p className="text-sm font-medium">{item.title || item.content || '체크리스트 항목'}</p>
                                   {item.description && (
                                     <p className="text-sm text-base-content/70 mt-1">{item.description}</p>
                                   )}

@@ -86,13 +86,13 @@ const ProjectCreationForm: React.FC<ProjectCreationFormProps> = ({
   };
 
   // 입력 필드 업데이트 함수
-  const updateProjectData = (field: keyof ProjectData | string, value: any) => {
+  const updateProjectData = (field: keyof ProjectData | string, value: string | number | File | File[] | undefined) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
       setProjectData(prev => ({
         ...prev,
         [parent]: {
-          ...(prev[parent as keyof ProjectData] as any),
+          ...(prev[parent as keyof ProjectData] as Record<string, unknown>),
           [child]: value
         }
       }));

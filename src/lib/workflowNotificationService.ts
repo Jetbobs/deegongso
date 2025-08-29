@@ -296,16 +296,16 @@ export class WorkflowNotificationService {
    * 알림 전송 여부 판단
    */
   private shouldSendNotification(
-    settings: any,
-    notificationType: keyof any
+    settings: Record<string, unknown>,
+    notificationType: string
   ): boolean {
     // 조용한 시간 확인
-    if (settings.quietHours.enabled) {
+    if (settings.quietHours && (settings.quietHours as any).enabled) {
       const now = new Date();
       const currentTime = now.getHours() * 100 + now.getMinutes();
       
-      const [startHour, startMin] = settings.quietHours.start.split(":").map(Number);
-      const [endHour, endMin] = settings.quietHours.end.split(":").map(Number);
+      const [startHour, startMin] = (settings.quietHours as any).start.split(":").map(Number);
+      const [endHour, endMin] = (settings.quietHours as any).end.split(":").map(Number);
       const startTime = startHour * 100 + startMin;
       const endTime = endHour * 100 + endMin;
       

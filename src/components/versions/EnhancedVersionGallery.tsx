@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { VersionManager, ImageUtils } from '@/lib/versionManager';
 import { DesignVersion, UserRole } from '@/types';
 
@@ -234,9 +235,11 @@ export default function EnhancedVersionGallery({
               {/* 썸네일 */}
               <figure className="relative aspect-video">
                 {version.thumbnail_url ? (
-                  <img
+                  <Image
                     src={version.thumbnail_url}
                     alt={version.title || `시안 v${version.version_number}`}
+                    width={400}
+                    height={240}
                     className="w-full h-full object-cover"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -383,9 +386,11 @@ export default function EnhancedVersionGallery({
                   {/* 썸네일 */}
                   <div className="w-16 h-12 relative flex-shrink-0">
                     {version.thumbnail_url ? (
-                      <img
+                      <Image
                         src={version.thumbnail_url}
                         alt={version.title || `시안 v${version.version_number}`}
+                        width={64}
+                        height={48}
                         className="w-full h-full object-cover rounded cursor-pointer"
                         onClick={() => setSelectedImage({
                           url: version.thumbnail_url!,
@@ -514,9 +519,11 @@ export default function EnhancedVersionGallery({
                              title: version.title || `시안 v${version.version_number}`,
                              version
                            })}>
-                        <img
+                        <Image
                           src={version.thumbnail_url}
                           alt={version.title || `시안 v${version.version_number}`}
+                          width={80}
+                          height={60}
                           className="w-full h-full object-cover rounded"
                         />
                       </div>
@@ -544,9 +551,11 @@ export default function EnhancedVersionGallery({
             </div>
             
             <div className="flex flex-col items-center">
-              <img 
+              <Image 
                 src={selectedImage.url}
                 alt={selectedImage.title}
+                width={800}
+                height={600}
                 className="max-w-full max-h-96 object-contain rounded-lg shadow-lg"
               />
               

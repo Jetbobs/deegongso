@@ -43,7 +43,7 @@ export default function DesignerProposalForm({
     client_company: initialData?.client_company || ""
   });
 
-  const updateFormData = (field: keyof typeof formData, value: any) => {
+  const updateFormData = (field: keyof typeof formData, value: string | number | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -87,7 +87,7 @@ export default function DesignerProposalForm({
           ...deadlines
         },
         payment_terms: {
-          type: formData.payment_type,
+          type: formData.payment_type as "upfront" | "after" | "split",
           twoPartTerms: {
             advancePayment: {
               amount: formData.advance_payment,

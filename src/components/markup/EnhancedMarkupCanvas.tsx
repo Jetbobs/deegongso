@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { MarkupManager, MARKUP_TOOLS, FEEDBACK_CATEGORIES } from '@/lib/markupManager';
-import { ImageMarkup, MarkupFeedback, MarkupType, FeedbackCategory, DesignVersion, UserRole, ChecklistItem } from '@/types';
+import { ImageMarkup, MarkupFeedback, MarkupType, FeedbackCategory, DesignVersion, UserRole, ChecklistItem, SubmittedModificationRequestData, Feedback } from '@/types';
 import MarkupComments from './MarkupComments';
 
 interface EnhancedMarkupCanvasProps {
@@ -10,23 +10,19 @@ interface EnhancedMarkupCanvasProps {
   projectId: string;
   userRole: UserRole;
   currentUserId: string;
-  generalFeedbacks?: any[]; // 일반 피드백 목록
+  generalFeedbacks?: Feedback[]; // 일반 피드백 목록
   onFeedbackCreate?: (feedback: MarkupFeedback) => void;
-  onFeedbackUpdate?: (feedback: MarkupFeedback) => void;
+  onFeedbackUpdate?: (feedback: MarkupFeedback | Feedback) => void;
   onMarkupDelete?: (markup: ImageMarkup) => void;
   readonly?: boolean;
-  onChecklistUpdate?: (checklistItems: any[]) => void;
-  onMarkupsUpdate?: (markups: any[]) => void;
-  onMarkupFeedbacksUpdate?: (feedbacks: any[]) => void;
+  onChecklistUpdate?: (checklistItems: ChecklistItem[]) => void;
+  onMarkupsUpdate?: (markups: ImageMarkup[]) => void;
+  onMarkupFeedbacksUpdate?: (feedbacks: MarkupFeedback[]) => void;
   onRevisionUpdate?: (revisionNumber: number) => void;
   onRemainingRevisionsUpdate?: (remaining: number) => void;
-  onSubmitModificationRequest?: (requestData: any) => void; // 제출된 수정요청으로 데이터 전달
+  onSubmitModificationRequest?: (requestData: SubmittedModificationRequestData) => void; // 제출된 수정요청으로 데이터 전달
 }
 
-interface CanvasPosition {
-  x: number;
-  y: number;
-}
 
 interface FeedbackForm {
   title: string;
@@ -71,9 +67,7 @@ export default function EnhancedMarkupCanvas({
   });
   const [isDrawing, setIsDrawing] = useState(false);
   const [showMarkupList, setShowMarkupList] = useState(true);
-  const [commentStats, setCommentStats] = useState(MarkupManager.getVersionCommentStats(version.id));
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
-  const [newChecklistItem, setNewChecklistItem] = useState('');
   const [showChecklistForm, setShowChecklistForm] = useState(false);
   const [checklistForm, setChecklistForm] = useState({
     content: '',
@@ -83,7 +77,7 @@ export default function EnhancedMarkupCanvas({
     referenceFiles: [] as File[]
   });
   const [currentRevisionNumber, setCurrentRevisionNumber] = useState(1);
-  const [totalRevisions, setTotalRevisions] = useState(3); // 프로젝트 생성 시 설정된 수정 횟수
+  const [totalRevisions] = useState(3); // 프로젝트 생성 시 설정된 수정 횟수
   const [remainingRevisions, setRemainingRevisions] = useState(2); // 남은 수정 횟수 (첫 제출로 1회 차감된 상태)
   const [isFirstSubmission, setIsFirstSubmission] = useState(true); // 첫 제출 여부
   
@@ -124,7 +118,6 @@ export default function EnhancedMarkupCanvas({
     const loadMarkupsAndFeedbacks = () => {
       const versionMarkups = MarkupManager.getVersionMarkups(version.id);
       const versionFeedbacks = MarkupManager.getVersionMarkupFeedbacks(version.id);
-      const versionCommentStats = MarkupManager.getVersionCommentStats(version.id);
       
       // 테스트용 마크업이 없으면 하나 생성 (개발 시에만)
       if (versionMarkups.length === 0 && process.env.NODE_ENV === 'development') {
@@ -146,7 +139,6 @@ export default function EnhancedMarkupCanvas({
       }
       
       setFeedbacks(versionFeedbacks);
-      setCommentStats(versionCommentStats);
     };
 
     loadMarkupsAndFeedbacks();
@@ -178,11 +170,9 @@ export default function EnhancedMarkupCanvas({
     const loadMarkupsAndFeedbacks = () => {
       const versionMarkups = MarkupManager.getVersionMarkups(version.id);
       const versionFeedbacks = MarkupManager.getVersionMarkupFeedbacks(version.id);
-      const versionCommentStats = MarkupManager.getVersionCommentStats(version.id);
       
       setMarkups(versionMarkups);
       setFeedbacks(versionFeedbacks);
-      setCommentStats(versionCommentStats);
     };
 
     loadMarkupsAndFeedbacks();
@@ -191,7 +181,6 @@ export default function EnhancedMarkupCanvas({
   // 검토 승인 시 새로운 차수의 체크리스트 생성
   const handleApprovalAndCreateNewRevision = () => {
     // 현재 체크리스트의 완료된 항목들을 기반으로 새로운 차수 생성
-    const completedItems = checklistItems.filter(item => item.completed);
     const pendingItems = checklistItems.filter(item => !item.completed && !item.isRevisionHeader);
     
     if (pendingItems.length > 0) {
@@ -246,8 +235,12 @@ export default function EnhancedMarkupCanvas({
     setCurrentRevisionNumber(nextRevisionNumber);
     setRemainingRevisions(remainingRevisions - 1);
     
-    // 댓글 데이터를 포함한 상세 정보 수집
-    const enrichedMarkups = markups.map((markup) => {
+    // 댓글 데이터를 포함한 상세 정보 수집 (아카이브되지 않은 항목들만)
+    const activeMarkups = markups.filter(m => !(m as any).isArchived);
+    const activeGeneralFeedbacks = generalFeedbacks.filter(f => !(f as any).isArchived);
+    const activeChecklistItems = checklistItems.filter(item => !item.isRevisionHeader && !(item as any).isArchived);
+    
+    const enrichedMarkups = activeMarkups.map((markup) => {
       const feedback = feedbacks.find(f => f.id === markup.feedback_id);
       
       // 댓글 데이터 수집 (MarkupManager에서 또는 기존 데이터에서)
@@ -298,14 +291,14 @@ export default function EnhancedMarkupCanvas({
         updatedAt: (feedback as any)?.updated_at || new Date().toISOString(),
         comments: comments,
         commentCount: comments?.length || markup.comment_count || 0,
-        hasUnresolvedComments: comments?.some((c: any) => !c.isResolved) || markup.has_unresolved_comments || false,
+        hasUnresolvedComments: comments?.some((c: { isResolved?: boolean }) => !c.isResolved) || markup.has_unresolved_comments || false,
         referenceUrls: feedback?.referenceUrls || [],
         markup: markup,
         feedback: feedback
       };
     });
 
-    const enrichedGeneralFeedbacks = generalFeedbacks.map((feedback) => {
+    const enrichedGeneralFeedbacks = activeGeneralFeedbacks.map((feedback) => {
       // 댓글 데이터 수집
       let comments = [];
       try {
@@ -350,15 +343,13 @@ export default function EnhancedMarkupCanvas({
         updatedAt: (feedback as any).updated_at || new Date().toISOString(),
         comments: comments,
         commentCount: comments?.length || 0,
-        hasUnresolvedComments: comments?.some((c: any) => !c.isResolved) || false,
+        hasUnresolvedComments: comments?.some((c: { isResolved?: boolean }) => !c.isResolved) || false,
         originalFeedback: feedback
       };
     });
 
     // 체크리스트 항목도 상세 정보와 함께 수집
-    const enrichedChecklistItems = checklistItems
-      .filter(item => !item.isRevisionHeader && !(item as any).isArchived)
-      .map((item) => {
+    const enrichedChecklistItems = activeChecklistItems.map((item) => {
         return {
           id: item.id,
           type: 'checklist_item',
@@ -377,49 +368,52 @@ export default function EnhancedMarkupCanvas({
       });
 
     // 제출된 수정요청 데이터 생성 (댓글 포함한 완전한 정보)
-    const submittedRequestData = {
+    const totalItems = enrichedMarkups.length + enrichedGeneralFeedbacks.length + enrichedChecklistItems.length;
+    const submittedRequestData: SubmittedModificationRequestData = {
       id: `modification-request-${Date.now()}`,
-      requestType: 'revision_approval',
-      projectId,
-      versionId: version.id,
       revisionNumber: currentRevisionNumber,
-      nextRevisionNumber,
+      submittedAt: new Date().toISOString(),
       status: 'approved',
+      title: `${currentRevisionNumber}차 수정요청`,
+      description: `마크업 피드백 ${feedbacks.length}개 및 수정 체크리스트 ${checklistItems.filter(item => !item.isRevisionHeader).length}개 항목`,
       approvedAt: new Date().toISOString(),
-      approvedBy: currentUserId,
-      title: `${currentRevisionNumber}회차 검토 승인 - 수정요청`,
-      description: `총 ${enrichedMarkups.length + enrichedGeneralFeedbacks.length + enrichedChecklistItems.length}개 항목의 수정요청이 승인되었습니다.`,
       
-      // 상세 항목들
+      // 상세 항목들 (아카이브되지 않은 실제 데이터)
       items: {
-        markupFeedbacks: enrichedMarkups,
-        generalFeedbacks: enrichedGeneralFeedbacks,
-        checklistItems: enrichedChecklistItems
+        markupFeedbacks: enrichedMarkups.map(em => em.feedback).filter(f => f != null), // 실제 마크업 피드백
+        generalFeedbacks: enrichedGeneralFeedbacks.map(eg => eg.originalFeedback).filter(f => f != null), // 실제 일반 피드백
+        checklistItems: enrichedChecklistItems.map(ec => ec.originalItem).filter(item => item != null) // 실제 체크리스트 항목
       },
       
-      // 요약 정보
-      summary: {
-        totalItems: enrichedMarkups.length + enrichedGeneralFeedbacks.length + enrichedChecklistItems.length,
-        markupCount: enrichedMarkups.length,
-        generalFeedbackCount: enrichedGeneralFeedbacks.length,
-        checklistCount: enrichedChecklistItems.length,
-        totalComments: enrichedMarkups.reduce((sum, item) => sum + item.commentCount, 0) + 
-                      enrichedGeneralFeedbacks.reduce((sum, item) => sum + item.commentCount, 0),
-        unresolvedComments: enrichedMarkups.filter(item => item.hasUnresolvedComments).length + 
-                           enrichedGeneralFeedbacks.filter(item => item.hasUnresolvedComments).length
-      },
-      
-      // 원본 데이터 (필요시 참조용)
-      originalData: {
-        markups,
-        feedbacks,
-        generalFeedbacks,
-        checklistItems: checklistItems.filter(item => !item.isRevisionHeader && !(item as any).isArchived)
-      }
+      // 필수 통계 정보
+      totalItems: totalItems,
+      approvedItems: totalItems, // 모든 항목이 승인됨
+      rejectedItems: 0,
+      pendingItems: 0
     };
 
     // 제출된 수정요청으로 데이터 전달
     if (onSubmitModificationRequest) {
+      console.log('🔍 제출할 데이터 디버깅:', {
+        totalItems,
+        activeMarkupsLength: activeMarkups.length,
+        activeGeneralFeedbacksLength: activeGeneralFeedbacks.length,
+        activeChecklistItemsLength: activeChecklistItems.length,
+        enrichedMarkupsLength: enrichedMarkups.length,
+        enrichedGeneralFeedbacksLength: enrichedGeneralFeedbacks.length,
+        enrichedChecklistItemsLength: enrichedChecklistItems.length,
+        submittedRequestData: {
+          id: submittedRequestData.id,
+          title: submittedRequestData.title,
+          description: submittedRequestData.description,
+          items: {
+            markupFeedbacksLength: submittedRequestData.items.markupFeedbacks.length,
+            generalFeedbacksLength: submittedRequestData.items.generalFeedbacks.length,
+            checklistItemsLength: submittedRequestData.items.checklistItems.length
+          },
+          totalItems: submittedRequestData.totalItems
+        }
+      });
       onSubmitModificationRequest(submittedRequestData);
     }
 
@@ -470,12 +464,11 @@ export default function EnhancedMarkupCanvas({
     console.log(`수정 횟수 차감: ${remainingRevisions} → ${remainingRevisions - 1}회 남음`);
     console.log('이전 차수 데이터 아카이브 완료');
     
-    alert(`${currentRevisionNumber}회차 검토가 승인되었습니다.\n\n📤 제출된 수정요청 생성 완료:\n• 마크업 피드백: ${enrichedMarkups.length}개\n• 일반 피드백: ${enrichedGeneralFeedbacks.length}개\n• 체크리스트: ${enrichedChecklistItems.length}개\n• 총 댓글: ${submittedRequestData.summary.totalComments}개\n\n✅ 제출된 수정요청 탭에서 댓글 포함 상세 내용을 확인할 수 있습니다.\n📋 ${nextRevisionNumber}회차 수정 요청사항을 새로 추가할 수 있습니다.\n\n남은 수정 횟수: ${remainingRevisions - 1}회`);
+    alert(`${currentRevisionNumber}회차 검토가 승인되었습니다.\n\n📤 제출된 수정요청 생성 완료:\n• 마크업 피드백: ${feedbacks.length}개\n• 일반 피드백: ${generalFeedbacks.length}개\n• 체크리스트: ${checklistItems.filter(item => !item.isRevisionHeader).length}개\n• 총 항목: ${totalItems}개\n\n✅ 제출된 수정요청 탭에서 상세 내용을 확인할 수 있습니다.\n📋 ${nextRevisionNumber}회차 수정 요청사항을 새로 추가할 수 있습니다.\n\n남은 수정 횟수: ${remainingRevisions - 1}회`);
     
     console.log('📤 제출된 수정요청으로 데이터 전달 완료:');
-    console.log('📋 요약 정보:', submittedRequestData.summary);
-    console.log('📝 상세 데이터:', submittedRequestData.items);
-    console.log('💬 댓글 데이터 포함:', submittedRequestData);
+    console.log('📋 상세 데이터:', submittedRequestData.items);
+    console.log('💬 제출된 요청 데이터:', submittedRequestData);
   };
 
   // 캔버스 클릭 처리 (클라이언트만)
@@ -1536,7 +1529,7 @@ export default function EnhancedMarkupCanvas({
 
           {/* 디자이너용 종합 검토 컨테이너 */}
           {(userRole as UserRole) === 'designer' && (
-            generalFeedbacks.filter(f => !f.isArchived).length > 0 || 
+            generalFeedbacks.filter(f => !(f as any).isArchived).length > 0 || 
             markups.filter(m => !(m as any).isArchived).length > 0 || 
             checklistItems.filter(item => !item.completed && !item.isCompleted && !(item as any).isArchived).length > 0
           ) && (
@@ -1547,7 +1540,7 @@ export default function EnhancedMarkupCanvas({
                   <div className="flex items-center gap-2">
                     <div className="badge badge-info badge-sm">
                       총 {
-                        generalFeedbacks.filter(f => !f.isArchived).length + 
+                        generalFeedbacks.filter(f => !(f as any).isArchived).length + 
                         markups.filter(m => !(m as any).isArchived).length + 
                         checklistItems.filter(item => !item.completed && !item.isCompleted && !(item as any).isArchived).length
                       }개 항목
@@ -1560,11 +1553,11 @@ export default function EnhancedMarkupCanvas({
                 
                 <div className="space-y-4">
                   {/* 일반 피드백 항목들 */}
-                  {generalFeedbacks.filter(f => !f.isArchived).length > 0 && (
+                  {generalFeedbacks.filter(f => !(f as any).isArchived).length > 0 && (
                     <div>
-                      <h5 className="font-medium text-sm text-primary mb-3">💬 일반 피드백 ({generalFeedbacks.filter(f => !f.isArchived).length}개)</h5>
+                      <h5 className="font-medium text-sm text-primary mb-3">💬 일반 피드백 ({generalFeedbacks.filter(f => !(f as any).isArchived).length}개)</h5>
                       <div className="space-y-2">
-                        {generalFeedbacks.filter(f => !f.isArchived).map((feedback) => {
+                        {generalFeedbacks.filter(f => !(f as any).isArchived).map((feedback) => {
                           const isExpanded = expandedFeedbacks.has(feedback.id);
                           
                           return (

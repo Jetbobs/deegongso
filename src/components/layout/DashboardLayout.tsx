@@ -7,14 +7,14 @@ import Header from "./Header";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
-  title: string;
-  userRole: UserRole;
+  title?: string;
+  userRole?: UserRole;
 }
 
 const DashboardLayout = ({
   children,
-  title,
-  userRole,
+  title = "Dashboard",
+  userRole = "client",
 }: DashboardLayoutProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 

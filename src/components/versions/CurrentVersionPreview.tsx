@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { DesignVersion } from "@/types";
 import { VersionManager } from "@/lib/versionManager";
 
@@ -93,9 +94,11 @@ export default function CurrentVersionPreview({
         {/* 시안 이미지 */}
         <div className="relative">
           <div className="aspect-video bg-base-200 rounded-lg overflow-hidden">
-            <img
+            <Image
               src={currentVersion.files[selectedImageIndex]?.file_url}
               alt={currentVersion.title || `버전 ${currentVersion.version_number}`}
+              width={800}
+              height={450}
               className="w-full h-full object-contain"
             />
           </div>
@@ -199,9 +202,11 @@ export default function CurrentVersionPreview({
                   }`}
                   onClick={() => setSelectedImageIndex(index)}
                 >
-                  <img
+                  <Image
                     src={file.file_url}
                     alt={`파일 ${index + 1}`}
+                    width={80}
+                    height={80}
                     className="w-full h-full object-cover"
                   />
                 </button>

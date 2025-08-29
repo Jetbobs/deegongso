@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Image from "next/image";
 import { FileWithPreview } from "@/types";
 
 interface FileUploadManagerProps {
@@ -220,9 +221,11 @@ export default function FileUploadManager({
                 {/* 파일 아이콘/미리보기 */}
                 <div className="flex-shrink-0">
                   {file.preview ? (
-                    <img
+                    <Image
                       src={file.preview}
                       alt={file.name}
+                      width={48}
+                      height={48}
                       className="w-12 h-12 object-cover rounded"
                     />
                   ) : (

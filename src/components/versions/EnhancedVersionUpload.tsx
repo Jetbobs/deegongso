@@ -169,7 +169,25 @@ export default function EnhancedVersionUpload({
     
     const files = Array.from(e.dataTransfer.files);
     const fakeEvent = {
-      target: { files }
+      target: { 
+        files,
+        value: '',
+        name: ''
+      },
+      currentTarget: null as any,
+      nativeEvent: new Event('change'),
+      bubbles: false,
+      cancelable: false,
+      defaultPrevented: false,
+      eventPhase: 0,
+      isTrusted: false,
+      preventDefault: () => {},
+      isDefaultPrevented: () => false,
+      stopPropagation: () => {},
+      isPropagationStopped: () => false,
+      persist: () => {},
+      timeStamp: Date.now(),
+      type: 'change'
     } as React.ChangeEvent<HTMLInputElement>;
     
     handleFileSelect(fakeEvent);

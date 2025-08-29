@@ -163,18 +163,18 @@ export default function ProjectCreatePage() {
         clientEmail: currentProposal.clientEmail || "",
         estimatedPrice: currentProposal.estimatedPrice || 0,
         totalModifications: currentProposal.totalModifications || 3,
-        additionalModificationFee: currentProposal.additionalModificationFee || 0,
+        additionalModificationFee: (currentProposal as any).additionalModificationFee || 0,
         schedule: currentProposal.schedule || {
           startDate: "",
           draftDeadline: "",
           finalDeadline: ""
         },
         paymentTerms: currentProposal.paymentTerms || { method: "lump_sum" },
-        contractFile: currentProposal.contractFile || null,
-        additionalFiles: currentProposal.additionalFiles || []
+        contractFile: currentProposal.contractFile as File | undefined,
+        additionalFiles: (currentProposal.additionalFiles || []) as File[]
       });
     }
-  }, [currentProposal, searchParams]);
+  }, [currentProposal, searchParams, projectData.name]);
 
   // 디자이너 전용 접근 가드 (1단계에서만)
   useEffect(() => {
@@ -190,13 +190,13 @@ export default function ProjectCreatePage() {
   };
 
   // 입력 필드 업데이트 함수 (스토어 연동)
-  const updateProjectData = (field: keyof ProjectData | string, value: any) => {
+  const updateProjectData = (field: keyof ProjectData | string, value: string | number | File | File[] | undefined) => {
     if (field.includes(".")) {
       const [parent, child] = field.split(".");
       setProjectData((prev) => ({
         ...prev,
         [parent]: {
-          ...(prev[parent as keyof ProjectData] as any),
+          ...(prev[parent as keyof ProjectData] as Record<string, unknown>),
           [child]: value,
         },
       }));

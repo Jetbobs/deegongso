@@ -24,10 +24,16 @@ export interface ClientUser extends BaseUser {
 // 디자이너 사용자 정보
 export interface DesignerUser extends BaseUser {
   role: "designer";
+  phone: string;
+  created_at: string;
+  updated_at: string;
   experience?: string;
   specialization?: string[];
   portfolio_url?: string;
   strengths?: string[]; // 강점
+  title?: string; // 직책/타이틀
+  isVerified?: boolean; // 인증 여부
+  bio?: string; // 자기소개
 }
 
 // 어드민 사용자 정보
@@ -107,6 +113,27 @@ export type ProjectCollaborationStatus =
   | "rejected" // 거절됨
   | "revision_needed"; // 수정 필요
 
+// 결제 조건 타입
+export interface PaymentTerms {
+  method: "lump_sum" | "installment" | "milestone";
+  type?: "upfront" | "after" | "split"; // 호환성을 위해 유지
+  upfrontPercentage?: number;
+  installmentRatio?: number;
+  installmentSchedule?: string;
+  description?: string;
+}
+
+// 프로젝트 일정 타입
+export interface ProjectSchedule {
+  startDate: string;
+  endDate: string;
+  draftDeadline: string;
+  firstReviewDeadline: string;
+  finalReviewDeadline: string;
+  finalDeadline?: string; // 호환성을 위한 추가
+  [key: string]: unknown; // 인덱스 시그니처 추가
+}
+
 // 협업 기반 프로젝트 제안서
 export interface ProjectProposal {
   id: string;
@@ -127,7 +154,7 @@ export interface ProjectProposal {
       first_review_deadline: string;
       final_review_deadline: string;
     };
-    payment_terms: any; // PaymentTerms 타입 참조
+    payment_terms: { method: "upfront" | "after" | "split"; installmentRatio?: number; installmentSchedule?: string; };
     designer_notes: string; // 디자이너 전문 의견
     portfolio_references?: string[]; // 포트폴리오 참조
   };
@@ -269,6 +296,10 @@ export interface Feedback {
   version: number; // 피드백 버전
   parent_feedback_id?: string; // 답글인 경우 부모 피드백 ID
   revision_request_count: number; // 이 피드백으로 인한 수정 요청 횟수
+  comment_count?: number; // 댓글 수
+  title?: string; // 피드백 제목
+  created_at: string; // 생성 시간
+  isArchived?: boolean; // 아카이브 상태
 }
 
 // 피드백 첨부파일
@@ -395,6 +426,7 @@ export interface ModificationRequest {
   additional_cost_amount?: number; // 추가 비용 금액
   notes?: string; // 추가 메모
   rejected_at?: string; // 거절 시간
+  rejected?: boolean; // 거절 여부
   work_progress?: WorkProgress; // 작업 진행 상황
 }
 
@@ -476,8 +508,8 @@ export interface ProgressUpdateEvent {
   checklist_item_id?: string;
   event_type: "started" | "progress_updated" | "completed" | "blocked" | "note_added" | "file_attached";
   description: string;
-  old_value?: any;
-  new_value?: any;
+  old_value?: string | number | boolean;
+  new_value?: string | number | boolean;
   created_by: string;
   created_at: string;
 }
@@ -704,15 +736,6 @@ export interface ApiResponse<T> {
   message?: string;
 }
 
-// 알림 타입
-export interface NotificationItem {
-  id: string;
-  user_id: string;
-  message: string;
-  is_read: boolean;
-  created_at: string; // ISO string
-  url: string;
-}
 
 // 네비게이션 관련 타입
 export interface NavigationItem {
@@ -789,7 +812,7 @@ export interface AdminActivity {
 export interface PlatformSetting {
   id: string;
   setting_key: string;
-  setting_value: any;
+  setting_value: string | number | boolean | Record<string, unknown>;
   description: string;
   updated_by: string;
   updated_at: string;
@@ -888,4 +911,193 @@ export interface AnnouncementFilter {
     start: string;
     end: string;
   };
+}
+
+// 사용자 개인 마크업 통계 타입
+export interface UserMarkupStats {
+  // 기본 통계
+  totalMarkups: number;           // 내가 생성한 총 마크업 수
+  totalFeedbacks: number;         // 내가 작성한 총 피드백 수
+  receivedFeedbacks: number;      // 내가 받은 피드백 수
+  
+  // 상태별 통계
+  pendingFeedbacks: number;       // 처리 대기 중인 피드백
+  resolvedFeedbacks: number;      // 해결된 피드백
+  
+  // 프로젝트별 통계
+  projectsWithMarkups: number;    // 마크업을 사용한 프로젝트 수
+  activeProjects: number;         // 현재 활성 프로젝트 수
+  
+  // 타입별 사용 통계
+  markupTypeUsage: {
+    [key in MarkupType]: number;
+  };
+  
+  // 시간별 통계
+  thisWeekMarkups: number;        // 이번 주 마크업 수
+  thisMonthMarkups: number;       // 이번 달 마크업 수
+  avgResponseTime?: number;       // 평균 응답 시간 (시간 단위)
+}
+
+// 사용자 최근 마크업 활동
+export interface UserMarkupActivity {
+  id: string;
+  type: 'markup_created' | 'feedback_created' | 'feedback_received' | 'feedback_resolved';
+  projectId: string;
+  projectName: string;
+  description: string;
+  createdAt: string;
+  markupId?: string;
+  feedbackId?: string;
+}
+
+// 설정 관련 타입들
+export interface PaymentSettings {
+  escrow_enabled: boolean;
+  auto_release_days: number;
+  refund_period_days: number;
+  minimum_project_amount: number;
+  payment_methods: string[];
+}
+
+export interface NotificationSettings {
+  email_notifications: boolean;
+  sms_notifications: boolean;
+  push_notifications: boolean;
+  admin_alerts: boolean;
+  dispute_notifications: boolean;
+  maintenance_notifications: boolean;
+}
+
+export interface SecuritySettings {
+  session_timeout: number;
+  max_login_attempts: number;
+  password_min_length: number;
+  require_2fa_admin: boolean;
+  ip_whitelist_enabled: boolean;
+  audit_log_retention_days: number;
+}
+
+// 분석 차트 타입들
+export interface UserGrowthData {
+  month: string;
+  clients: number;
+  designers: number;
+  total: number;
+}
+
+export interface RevenueData {
+  month: string;
+  revenue: number;
+  projects: number;
+}
+
+export interface ProjectStatusData {
+  name: string;
+  value: number;
+  color: string;
+}
+
+export interface TopDesignerData {
+  name: string;
+  projects: number;
+  revenue: number;
+  rating: number;
+}
+
+export interface ChartTooltipProps {
+  active?: boolean;
+  payload?: ChartTooltipPayload[];
+  label?: string;
+}
+
+export interface ChartTooltipPayload {
+  dataKey: string;
+  value: number;
+  color: string;
+}
+
+export type TimeRange = "week" | "month" | "quarter" | "year";
+export type AdminSettingsTab = "platform" | "payment" | "notifications" | "security";
+
+// 관리 탭 정의
+export interface AdminTab {
+  id: string;
+  label: string;
+  icon: string;
+}
+
+// 알림 관련 타입들
+export interface NotificationItem {
+  id: string;
+  user_id: string;
+  message: string;
+  url: string;
+  created_at: string;
+  is_read: boolean;
+  priority?: "low" | "medium" | "high";
+}
+
+export interface ArchiveData {
+  versionId: string;
+  revisionNumber: number;
+  archivedAt: string;
+  markups: ImageMarkup[];
+  feedbacks: MarkupFeedback[];
+  generalFeedbacks: Feedback[];
+}
+
+// 프로젝트 기본 정보 (Project 인터페이스에서 필요한 필드만)
+export interface ProjectInfo {
+  id: string;
+  name?: string;
+  client_id: string;
+  designer_id: string;
+  total_modification_count?: number;
+  remaining_modification_count: number;
+  additional_modification_fee?: number;
+  modification_history?: ModificationRecord[];
+  updated_at?: string;
+}
+
+// Konva Stage 타입 정의
+export interface KonvaStage {
+  getPointerPosition(): { x: number; y: number } | null;
+  container(): HTMLDivElement;
+}
+
+// 수정 횟수 현황 타입
+export interface ModificationCountStatus {
+  total_allowed: number;
+  used: number;
+  in_progress: number;
+  remaining: number;
+  additional_used: number;
+  total_additional_cost: number;
+  is_limit_exceeded: boolean;
+  next_modification_cost: number;
+  warning_threshold: number;
+  should_warn: boolean;
+  status_color: 'error' | 'warning' | 'info' | 'success';
+  status_message: string;
+}
+
+// 제출된 수정요청 타입
+export interface SubmittedModificationRequestData {
+  id: string;
+  revisionNumber: number;
+  submittedAt: string;
+  status: 'submitted' | 'reviewed' | 'approved' | 'rejected';
+  title?: string; // 수정요청 제목
+  description?: string; // 수정요청 설명
+  approvedAt?: string; // 승인 시간
+  items: {
+    generalFeedbacks: Feedback[];
+    markupFeedbacks: MarkupFeedback[];
+    checklistItems: ChecklistItem[];
+  };
+  totalItems: number;
+  approvedItems: number;
+  rejectedItems: number;
+  pendingItems: number;
 }

@@ -137,7 +137,7 @@ export function useImageWithFallback(
 
     const handleError = (e: Event | string) => {
       let errorReason = '';
-      let errorDetails: any = {};
+      let errorDetails: Record<string, unknown> = {};
       
       if (typeof e === 'string') {
         errorReason = e;
@@ -251,7 +251,7 @@ export function useImageWithFallback(
       // 이미지 로딩 중단
       img.src = '';
     };
-  }, [memoizedUrls, urlIndex, crossOrigin]);
+  }, [memoizedUrls, urlIndex, crossOrigin, isProcessing]);
 
   return { image, status, currentUrl, error, debugInfo };
 }

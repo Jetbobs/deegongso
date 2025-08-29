@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Stage, Layer, Image as KonvaImage, Circle, Rect, Text, Arrow } from "react-konva";
-import { ImageMarkup, MarkupType } from "@/types";
+import { ImageMarkup, MarkupType, KonvaStage } from "@/types";
 import { MarkupManager, MARKUP_TOOLS } from "@/lib/markupManager";
 import ImageUploadSection from "./ImageUploadSection";
 
@@ -32,7 +32,7 @@ export default function TestImageCanvas({
   const [testImage, setTestImage] = useState<HTMLImageElement | null>(null);
   const [uploadedImage, setUploadedImage] = useState<HTMLImageElement | null>(null);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string>('');
-  const stageRef = useRef<any>(null);
+  const stageRef = useRef<KonvaStage | null>(null);
 
   // 간단한 테스트 이미지 생성
   useEffect(() => {
@@ -109,7 +109,7 @@ export default function TestImageCanvas({
   const currentImage = uploadedImage || testImage;
 
   // Stage 클릭 핸들러
-  const handleStageClick = (e: any) => {
+  const handleStageClick = (e: { target: { getStage: () => KonvaStage }; evt: MouseEvent }) => {
     if (!isMarkupMode || !selectedTool) return;
     
     // 기존 마크업을 클릭한 경우는 제외

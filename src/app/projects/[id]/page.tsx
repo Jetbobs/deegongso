@@ -6,14 +6,13 @@ import Image from "next/image";
 import { useAuth } from "@/hooks/useAuth";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import AuthWrapper from "@/components/auth/AuthWrapper";
-import { Project, Feedback, UserRole } from "@/types";
+import { Project, Feedback, UserRole, ChecklistItem, ImageMarkup, MarkupFeedback, SubmittedModificationRequestData } from "@/types";
 import { ProjectWorkflowManager } from "@/lib/projectWorkflow";
 import { FeedbackVersionManager } from "@/lib/feedbackVersionManager";
 import SubmittedRequestsList from "@/components/feedback/SubmittedRequestsList";
 
 import FileUpload, { UploadedFile } from "@/components/ui/FileUpload";
 import { addNotification } from "@/lib/notifications";
-import VersionManagerComponent from "@/components/versions/VersionManager";
 import CurrentVersionPreview from "@/components/versions/CurrentVersionPreview";
 import ModificationCountDisplay from "@/components/modification/ModificationCountDisplay";
 import EnhancedVersionUpload from "@/components/versions/EnhancedVersionUpload";
@@ -21,23 +20,7 @@ import EnhancedVersionGallery from "@/components/versions/EnhancedVersionGallery
 import EnhancedMarkupCanvas from "@/components/markup/EnhancedMarkupCanvas";
 import SubmittedModificationRequests from "@/components/feedback/SubmittedModificationRequests";
 import { initializeMockVersionData } from "@/lib/mockVersionData";
-import dynamic from "next/dynamic";
 
-// 동적 임포트로 MarkupFeedbackSystem 로드 (SSR 비활성화)
-const DynamicMarkupFeedbackSystem = dynamic(
-  () => import("@/components/markup/MarkupFeedbackSystem"),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <div className="loading loading-spinner loading-lg text-primary mb-4"></div>
-          <div className="text-base-content/70">마크업 시스템을 불러오는 중...</div>
-        </div>
-      </div>
-    ),
-  }
-);
 import { VersionManager } from "@/lib/versionManager";
 
 const MOCK_PROJECT: Project = {
@@ -185,15 +168,15 @@ export default function EnhancedProjectDetailPage() {
   } | null>(null);
   
   // 수정요청 관련 상태
-  const [checklistItems, setChecklistItems] = useState<any[]>([]);
-  const [markups, setMarkups] = useState<any[]>([]);
-  const [markupFeedbacks, setMarkupFeedbacks] = useState<any[]>([]);
+  const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
+  const [markups, setMarkups] = useState<ImageMarkup[]>([]);
+  const [markupFeedbacks, setMarkupFeedbacks] = useState<MarkupFeedback[]>([]);
   const [currentRevisionNumber, setCurrentRevisionNumber] = useState(1);
   const [totalRevisions, setTotalRevisions] = useState(3);
   const [remainingRevisions, setRemainingRevisions] = useState(2);
   
   // 제출된 수정요청 상태
-  const [submittedModificationRequests, setSubmittedModificationRequests] = useState<any[]>([]);
+  const [submittedModificationRequests, setSubmittedModificationRequests] = useState<SubmittedModificationRequestData[]>([]);
   
   // 파일 필터링 상태
   const [fileSearchTerm, setFileSearchTerm] = useState('');

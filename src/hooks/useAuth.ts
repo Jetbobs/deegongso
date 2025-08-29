@@ -8,9 +8,9 @@ interface User {
   id: string;
   email: string;
   name: string;
-  userType: "client" | "designer";
+  userType: "client" | "designer" | "admin";
   // 타입 일관화를 위해 role을 함께 노출 (userType과 동일 값)
-  role?: "client" | "designer";
+  role?: "client" | "designer" | "admin";
   phone?: string;
   company?: string;
   experience?: string;
@@ -36,6 +36,14 @@ const MOCK_USERS: User[] = [
     role: "designer",
     phone: "010-9876-5432",
     experience: "3-5년",
+  },
+  {
+    id: "3",
+    email: "admin@gmail.com",
+    name: "관리자",
+    userType: "admin",
+    role: "admin",
+    phone: "010-0000-0000",
   },
 ];
 

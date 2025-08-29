@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ModificationManager } from '@/lib/modificationManager';
+import { ModificationCountStatus } from '@/types';
 
 interface ModificationCountDisplayProps {
   projectId: string;
@@ -16,7 +17,7 @@ export default function ModificationCountDisplay({
   onLimitExceeded,
   onWarning
 }: ModificationCountDisplayProps) {
-  const [countStatus, setCountStatus] = useState<any>(null);
+  const [countStatus, setCountStatus] = useState<ModificationCountStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

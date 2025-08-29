@@ -17,6 +17,7 @@ export interface ProposalDraft {
   // 예산 및 일정
   estimatedPrice: number;
   totalModifications: number;
+  additionalModificationFee: number;
   schedule: {
     startDate: string;
     draftDeadline: string;
@@ -105,6 +106,7 @@ const createEmptyProposal = (): ProposalDraft => ({
   
   estimatedPrice: 0,
   totalModifications: 3,
+  additionalModificationFee: 0,
   schedule: {
     startDate: '',
     draftDeadline: '',

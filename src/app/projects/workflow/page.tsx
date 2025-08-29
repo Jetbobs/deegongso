@@ -9,7 +9,7 @@ const ProjectWorkflowPage: React.FC = () => {
   const [currentUserRole, setCurrentUserRole] = useState<UserRole>('designer');
   const [isFormVisible, setIsFormVisible] = useState(false);
 
-  const handleProjectComplete = (data: any) => {
+  const handleProjectComplete = (data: Record<string, unknown>) => {
     console.log('프로젝트 완료 데이터:', data);
     alert('프로젝트 워크플로우가 성공적으로 완료되었습니다!');
     setIsFormVisible(false);

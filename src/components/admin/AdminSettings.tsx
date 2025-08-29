@@ -1,10 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { PlatformSetting } from "@/types";
+import { 
+  PlatformSetting, 
+  PaymentSettings, 
+  NotificationSettings, 
+  SecuritySettings,
+  AdminSettingsTab,
+  AdminTab
+} from "@/types";
 
 export default function AdminSettings() {
-  const [activeTab, setActiveTab] = useState<"platform" | "payment" | "notifications" | "security">("platform");
+  const [activeTab, setActiveTab] = useState<AdminSettingsTab>("platform");
   const [showSaveModal, setShowSaveModal] = useState(false);
 
   // Mock 플랫폼 설정 데이터
@@ -35,7 +42,7 @@ export default function AdminSettings() {
     }
   ]);
 
-  const [paymentSettings, setPaymentSettings] = useState({
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>({
     escrow_enabled: true,
     auto_release_days: 7,
     refund_period_days: 14,
@@ -43,7 +50,7 @@ export default function AdminSettings() {
     payment_methods: ["card", "bank_transfer", "virtual_account"]
   });
 
-  const [notificationSettings, setNotificationSettings] = useState({
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
     email_notifications: true,
     sms_notifications: false,
     push_notifications: true,
@@ -52,7 +59,7 @@ export default function AdminSettings() {
     maintenance_notifications: true
   });
 
-  const [securitySettings, setSecuritySettings] = useState({
+  const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({
     session_timeout: 30,
     max_login_attempts: 5,
     password_min_length: 8,
@@ -61,14 +68,14 @@ export default function AdminSettings() {
     audit_log_retention_days: 365
   });
 
-  const tabs = [
+  const tabs: AdminTab[] = [
     { id: "platform", label: "플랫폼 설정", icon: "⚙️" },
     { id: "payment", label: "결제 설정", icon: "💳" },
     { id: "notifications", label: "알림 설정", icon: "🔔" },
     { id: "security", label: "보안 설정", icon: "🔒" }
   ];
 
-  const handleSavePlatformSetting = (key: string, value: any) => {
+  const handleSavePlatformSetting = (key: string, value: string | number | boolean) => {
     setPlatformSettings(prev => 
       prev.map(setting => 
         setting.setting_key === key 
@@ -443,7 +450,7 @@ export default function AdminSettings() {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id as AdminSettingsTab)}
                 className={`
                   flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm
                   ${activeTab === tab.id

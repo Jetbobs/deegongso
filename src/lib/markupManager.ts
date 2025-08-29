@@ -1,4 +1,4 @@
-import { ImageMarkup, MarkupFeedback, MarkupType, FeedbackCategory, MarkupComment } from "@/types";
+import { ImageMarkup, MarkupFeedback, MarkupType, FeedbackCategory, MarkupComment, ArchiveData, Feedback, UserMarkupStats, UserMarkupActivity } from "@/types";
 
 /**
  * 이미지 마크업 관리를 위한 유틸리티 클래스
@@ -516,9 +516,9 @@ export class MarkupManager {
    * 차수별 데이터 아카이브
    */
   static archiveVersionData(versionId: string, revisionNumber: number, data: {
-    markups: any[];
-    feedbacks: any[];
-    generalFeedbacks: any[];
+    markups: ImageMarkup[];
+    feedbacks: MarkupFeedback[];
+    generalFeedbacks: Feedback[];
   }): boolean {
     try {
       const archiveKey = `markup_archive_${versionId}_rev${revisionNumber}`;
@@ -543,7 +543,7 @@ export class MarkupManager {
   /**
    * 아카이브된 데이터 조회
    */
-  static getArchivedVersionData(versionId: string, revisionNumber: number): any | null {
+  static getArchivedVersionData(versionId: string, revisionNumber: number): ArchiveData | null {
     try {
       const archiveKey = `markup_archive_${versionId}_rev${revisionNumber}`;
       const archiveData = localStorage.getItem(archiveKey);
@@ -557,9 +557,9 @@ export class MarkupManager {
   /**
    * 버전의 모든 아카이브 조회
    */
-  static getAllArchivedRevisions(versionId: string): any[] {
+  static getAllArchivedRevisions(versionId: string): ArchiveData[] {
     try {
-      const archives: any[] = [];
+      const archives: ArchiveData[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith(`markup_archive_${versionId}_rev`)) {
@@ -574,6 +574,201 @@ export class MarkupManager {
       console.error('아카이브 목록 조회 실패:', error);
       return [];
     }
+  }
+
+  /**
+   * 모든 버전 ID를 가져옵니다 (실제 구현에서는 프로젝트 API에서 가져옴)
+   */
+  static getAllVersionIds(): string[] {
+    // localStorage에서 모든 프로젝트의 버전 ID를 가져옵니다
+    const markupsData = localStorage.getItem('project_markups');
+    if (!markupsData) return [];
+    
+    try {
+      const allMarkups = JSON.parse(markupsData);
+      const versionIds = new Set<string>();
+      
+      Object.keys(allMarkups).forEach(versionId => {
+        if (allMarkups[versionId] && allMarkups[versionId].length > 0) {
+          versionIds.add(versionId);
+        }
+      });
+      
+      return Array.from(versionIds);
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * 마크업 ID로 마크업을 찾습니다
+   */
+  static getMarkupById(markupId: string): ImageMarkup | null {
+    const allVersionIds = this.getAllVersionIds();
+    
+    for (const versionId of allVersionIds) {
+      const markups = this.getVersionMarkups(versionId);
+      const markup = markups.find(m => m.id === markupId);
+      if (markup) return markup;
+    }
+    
+    return null;
+  }
+
+  /**
+   * 사용자별 마크업 통계를 가져옵니다
+   */
+  static getUserMarkupStats(userId: string): UserMarkupStats {
+    const allVersionIds = this.getAllVersionIds();
+    
+    let totalMarkups = 0;
+    let totalFeedbacks = 0;
+    let receivedFeedbacks = 0;
+    let pendingFeedbacks = 0;
+    let resolvedFeedbacks = 0;
+    
+    const projectsSet = new Set<string>();
+    const markupTypeUsage: { [key in MarkupType]: number } = {
+      point: 0,
+      circle: 0, 
+      arrow: 0,
+      rectangle: 0,
+      text: 0,
+      freehand: 0
+    };
+    
+    let thisWeekMarkups = 0;
+    let thisMonthMarkups = 0;
+    
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    
+    allVersionIds.forEach(versionId => {
+      // 내가 생성한 마크업
+      const userMarkups = this.getVersionMarkups(versionId)
+        .filter(markup => markup.created_by === userId);
+      
+      totalMarkups += userMarkups.length;
+      
+      userMarkups.forEach(markup => {
+        // 프로젝트 추가
+        projectsSet.add(versionId);
+        
+        // 타입별 카운트
+        if (markupTypeUsage[markup.type] !== undefined) {
+          markupTypeUsage[markup.type]++;
+        }
+        
+        // 시간별 카운트
+        const createdDate = new Date(markup.created_at);
+        if (createdDate >= weekAgo) thisWeekMarkups++;
+        if (createdDate >= monthAgo) thisMonthMarkups++;
+      });
+      
+      // 내가 작성한 피드백
+      const userFeedbacks = this.getVersionMarkupFeedbacks(versionId)
+        .filter(feedback => feedback.created_by === userId);
+      
+      totalFeedbacks += userFeedbacks.length;
+      
+      userFeedbacks.forEach(feedback => {
+        if (feedback.status === 'pending' || feedback.status === 'in_progress') {
+          pendingFeedbacks++;
+        } else if (feedback.status === 'resolved') {
+          resolvedFeedbacks++;
+        }
+      });
+      
+      // 내가 받은 피드백 (내 마크업에 대한 다른 사람의 피드백)
+      const receivedCount = this.getVersionMarkupFeedbacks(versionId)
+        .filter(feedback => {
+          const markup = this.getMarkupById(feedback.markup_id);
+          return markup?.created_by === userId && feedback.created_by !== userId;
+        }).length;
+      
+      receivedFeedbacks += receivedCount;
+    });
+    
+    return {
+      totalMarkups,
+      totalFeedbacks,
+      receivedFeedbacks,
+      pendingFeedbacks,
+      resolvedFeedbacks,
+      projectsWithMarkups: projectsSet.size,
+      activeProjects: projectsSet.size, // 현재는 모든 프로젝트가 활성으로 가정
+      markupTypeUsage,
+      thisWeekMarkups,
+      thisMonthMarkups
+    };
+  }
+
+  /**
+   * 사용자의 최근 마크업 활동을 가져옵니다
+   */
+  static getUserRecentActivity(userId: string, limit: number = 10): UserMarkupActivity[] {
+    const allVersionIds = this.getAllVersionIds();
+    const activities: UserMarkupActivity[] = [];
+    
+    allVersionIds.forEach(versionId => {
+      // 내가 생성한 마크업
+      const userMarkups = this.getVersionMarkups(versionId)
+        .filter(markup => markup.created_by === userId);
+        
+      userMarkups.forEach(markup => {
+        activities.push({
+          id: `markup_${markup.id}`,
+          type: 'markup_created',
+          projectId: versionId,
+          projectName: `프로젝트 ${versionId}`,
+          description: `${markup.type} 마크업을 생성했습니다`,
+          createdAt: markup.created_at,
+          markupId: markup.id
+        });
+      });
+      
+      // 내가 작성한 피드백
+      const userFeedbacks = this.getVersionMarkupFeedbacks(versionId)
+        .filter(feedback => feedback.created_by === userId);
+        
+      userFeedbacks.forEach(feedback => {
+        activities.push({
+          id: `feedback_${feedback.id}`,
+          type: 'feedback_created',
+          projectId: versionId,
+          projectName: `프로젝트 ${versionId}`,
+          description: `"${feedback.title}" 피드백을 작성했습니다`,
+          createdAt: feedback.created_at,
+          feedbackId: feedback.id,
+          markupId: feedback.markup_id
+        });
+      });
+      
+      // 내가 받은 피드백
+      const receivedFeedbacks = this.getVersionMarkupFeedbacks(versionId)
+        .filter(feedback => {
+          const markup = this.getMarkupById(feedback.markup_id);
+          return markup?.created_by === userId && feedback.created_by !== userId;
+        });
+        
+      receivedFeedbacks.forEach(feedback => {
+        activities.push({
+          id: `received_${feedback.id}`,
+          type: 'feedback_received',
+          projectId: versionId,
+          projectName: `프로젝트 ${versionId}`,
+          description: `"${feedback.title}" 피드백을 받았습니다`,
+          createdAt: feedback.created_at,
+          feedbackId: feedback.id,
+          markupId: feedback.markup_id
+        });
+      });
+    });
+    
+    // 시간순 정렬 후 제한된 개수만 반환
+    return activities
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, limit);
   }
 }
 

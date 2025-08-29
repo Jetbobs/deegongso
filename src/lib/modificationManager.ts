@@ -1,4 +1,4 @@
-import { ModificationRequest, ModificationTracker, ModificationRequestFormData, Feedback, ClarificationRequest, FeedbackClarityAssessment, WorkProgress, WorkChecklistItem, ProgressUpdateEvent, WorkAttachment } from "@/types";
+import { ModificationRequest, ModificationTracker, ModificationRequestFormData, Feedback, ClarificationRequest, FeedbackClarityAssessment, WorkProgress, WorkChecklistItem, ProgressUpdateEvent, WorkAttachment, ProjectInfo, NotificationItem } from "@/types";
 import { workflowNotification, createNotificationContext } from "./workflowNotificationService";
 
 /**
@@ -265,10 +265,12 @@ export class ModificationManager {
    */
   static createModificationLimitNotification(projectId: string, userId: string): void {
     this.sendNotification({
+      id: this.generateId(),
       user_id: userId,
       message: "⚠️ 계약된 수정 횟수를 모두 사용했습니다. 추가 수정은 별도 요금이 발생합니다.",
       url: `/projects/${projectId}`,
       created_at: new Date().toISOString(),
+      is_read: false,
       priority: "high"
     });
   }
@@ -292,15 +294,17 @@ export class ModificationManager {
       warning_threshold: Math.ceil(tracker.total_allowed * 0.8) // 80% 사용 시 경고
     };
 
+    const should_warn = tracker.used >= status.warning_threshold && !status.is_limit_exceeded;
+    
     return {
       ...status,
-      should_warn: tracker.used >= status.warning_threshold && !status.is_limit_exceeded,
-      status_color: status.is_limit_exceeded ? 'error' : 
-                   status.should_warn ? 'warning' : 
-                   tracker.used > 0 ? 'info' : 'success',
+      should_warn,
+      status_color: (status.is_limit_exceeded ? 'error' : 
+                   should_warn ? 'warning' : 
+                   tracker.used > 0 ? 'info' : 'success') as 'error' | 'warning' | 'info' | 'success',
       status_message: status.is_limit_exceeded 
         ? `계약 범위를 초과했습니다. 추가 수정은 ${this.formatCurrency(status.next_modification_cost)}이 부과됩니다.`
-        : status.should_warn 
+        : should_warn 
         ? `${status.remaining}회 남았습니다. 신중하게 사용해주세요.`
         : `${status.remaining}회 수정이 가능합니다.`
     };
@@ -341,10 +345,12 @@ export class ModificationManager {
 
     // 실제 알림 시스템에 전달
     this.sendNotification({
+      id: this.generateId(),
       user_id: recipientId,
       message: messages[type],
       url: `/projects/${request.project_id}/modifications/${request.id}`,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      is_read: false
     });
   }
 
@@ -1060,7 +1066,7 @@ export class ModificationManager {
     const modificationRecord = {
       id: this.generateId(),
       project_id: projectId,
-      modification_number: project.modification_history?.length + 1 || 1,
+      modification_number: (project.modification_history?.length || 0) + 1,
       description: completedRequest.description,
       is_additional: completedRequest.is_additional_cost,
       additional_fee: completedRequest.additional_cost_amount,
@@ -1109,13 +1115,20 @@ export class ModificationManager {
     return stored ? JSON.parse(stored) : [];
   }
 
-  private static getProject(projectId: string): any {
+  private static getProject(projectId: string): ProjectInfo | null {
     // 실제 구현에서는 API 호출 또는 데이터베이스 조회
     const stored = localStorage.getItem(`project_${projectId}`);
-    return stored ? JSON.parse(stored) : { total_modification_count: 3, additional_modification_fee: 50000 };
+    return stored ? JSON.parse(stored) : { 
+      id: projectId,
+      client_id: '',
+      designer_id: '',
+      total_modification_count: 3,
+      remaining_modification_count: 3,
+      additional_modification_fee: 50000
+    };
   }
 
-  private static getProjectInfo(projectId: string): any {
+  private static getProjectInfo(projectId: string): ProjectInfo | null {
     return this.getProject(projectId);
   }
 
@@ -1125,12 +1138,12 @@ export class ModificationManager {
     return stored ? JSON.parse(stored) : [];
   }
 
-  private static saveProject(project: any): void {
+  private static saveProject(project: ProjectInfo): void {
     // 실제 구현에서는 API 호출 또는 데이터베이스 저장
     localStorage.setItem(`project_${project.id}`, JSON.stringify(project));
   }
 
-  private static sendNotification(notification: any): void {
+  private static sendNotification(notification: NotificationItem): void {
     // 실제 알림 시스템 연동
     console.log("Sending notification:", notification);
   }
