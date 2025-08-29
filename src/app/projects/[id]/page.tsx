@@ -192,6 +192,9 @@ export default function EnhancedProjectDetailPage() {
   const [totalRevisions, setTotalRevisions] = useState(3);
   const [remainingRevisions, setRemainingRevisions] = useState(2);
   
+  // 제출된 수정요청 상태
+  const [submittedModificationRequests, setSubmittedModificationRequests] = useState<any[]>([]);
+  
   // 파일 필터링 상태
   const [fileSearchTerm, setFileSearchTerm] = useState('');
   const [selectedFileCategory, setSelectedFileCategory] = useState('all');
@@ -787,6 +790,18 @@ export default function EnhancedProjectDetailPage() {
                 onMarkupFeedbacksUpdate={setMarkupFeedbacks}
                 onRevisionUpdate={setCurrentRevisionNumber}
                 onRemainingRevisionsUpdate={setRemainingRevisions}
+                onSubmitModificationRequest={(requestData) => {
+                  // 제출된 수정요청 리스트에 추가
+                  setSubmittedModificationRequests(prev => [requestData, ...prev]);
+                  
+                  console.log('📤 제출된 수정요청 추가됨:', requestData);
+                  
+                  addNotification({
+                    message: `${requestData.revisionNumber}회차 검토가 승인되어 제출된 수정요청에 추가되었습니다.`,
+                    user_id: user?.id || "",
+                    url: `/projects/${projectId}?tab=submitted-requests`,
+                  });
+                }}
               />
             )}
 
@@ -803,6 +818,7 @@ export default function EnhancedProjectDetailPage() {
                 currentRevisionNumber={currentRevisionNumber}
                 totalRevisions={totalRevisions}
                 remainingRevisions={remainingRevisions}
+                submittedRequests={submittedModificationRequests}
                 onChecklistItemToggle={(itemId: string, completed: boolean) => {
                   setChecklistItems(prev => 
                     prev.map(item => 

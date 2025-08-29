@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { ChecklistItem } from '@/types';
+import MarkupComments from '../markup/MarkupComments';
 
 interface SubmittedModificationRequestsProps {
   projectId: string;
@@ -14,6 +15,7 @@ interface SubmittedModificationRequestsProps {
   currentRevisionNumber: number;
   totalRevisions: number;
   remainingRevisions: number;
+  submittedRequests?: any[]; // 검토 승인으로 생성된 제출된 수정요청들
   onChecklistItemToggle?: (itemId: string, completed: boolean) => void;
 }
 
@@ -28,12 +30,27 @@ export default function SubmittedModificationRequests({
   currentRevisionNumber,
   totalRevisions,
   remainingRevisions,
+  submittedRequests = [],
   onChecklistItemToggle
 }: SubmittedModificationRequestsProps) {
   const [expandedRevisions, setExpandedRevisions] = useState<Set<number>>(new Set([currentRevisionNumber]));
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
   
   // 디버깅: userRole 확인
   console.log('SubmittedModificationRequests userRole:', userRole);
+  
+  // 댓글 섹션 토글
+  const toggleComments = (itemId: string) => {
+    setExpandedComments(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
+      } else {
+        newSet.add(itemId);
+      }
+      return newSet;
+    });
+  };
 
   // 차수별로 체크리스트 그룹화
   const groupedByRevision = React.useMemo(() => {
@@ -136,7 +153,7 @@ export default function SubmittedModificationRequests({
     onChecklistItemToggle?.(itemId, newCompleted);
   };
 
-  if (checklistItems.length === 0 && generalFeedbacks.length === 0 && markups.length === 0) {
+  if (checklistItems.length === 0 && generalFeedbacks.length === 0 && markups.length === 0 && submittedRequests.length === 0) {
     return (
       <div className="card bg-base-100 shadow-sm">
         <div className="card-body p-4">
@@ -157,14 +174,288 @@ export default function SubmittedModificationRequests({
   }
 
   return (
-    <div className="card bg-base-100 shadow-sm">
-      <div className="card-body p-4">
-        {/* 헤더 */}
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="font-medium">📋 제출된 수정요청</h4>
-          <div className="flex items-center gap-2">
-            <div className="badge badge-info badge-sm">
-              총 {checklistItems.filter(item => !item.isRevisionHeader).length}개 항목
+    <div className="space-y-6">
+      {/* 검토 승인으로 생성된 제출된 수정요청 섹션 */}
+      {submittedRequests.length > 0 && (
+        <div className="card bg-base-100 shadow-sm">
+          <div className="card-body p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="font-medium">📤 검토 승인된 수정요청</h4>
+              <div className="badge badge-success badge-sm">
+                {submittedRequests.length}건
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              {submittedRequests.map((request, index) => (
+                <div key={request.id} className="border border-base-300 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h5 className="font-medium text-lg">{request.title}</h5>
+                      <p className="text-sm text-base-content/70">{request.description}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="badge badge-success">{request.status}</div>
+                      <p className="text-xs text-base-content/60 mt-1">
+                        {new Date(request.approvedAt).toLocaleDateString('ko-KR')}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* 요약 정보 */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div className="text-center p-2 bg-primary/10 rounded">
+                      <div className="text-lg font-bold text-primary">{request.summary.markupCount}</div>
+                      <div className="text-xs text-base-content/70">마크업 피드백</div>
+                    </div>
+                    <div className="text-center p-2 bg-info/10 rounded">
+                      <div className="text-lg font-bold text-info">{request.summary.generalFeedbackCount}</div>
+                      <div className="text-xs text-base-content/70">일반 피드백</div>
+                    </div>
+                    <div className="text-center p-2 bg-secondary/10 rounded">
+                      <div className="text-lg font-bold text-secondary">{request.summary.checklistCount}</div>
+                      <div className="text-xs text-base-content/70">체크리스트</div>
+                    </div>
+                    <div className="text-center p-2 bg-accent/10 rounded">
+                      <div className="text-lg font-bold text-accent">{request.summary.totalComments}</div>
+                      <div className="text-xs text-base-content/70">총 댓글</div>
+                    </div>
+                  </div>
+                  
+                  {/* 상세 항목들 */}
+                  <div className="collapse collapse-arrow border border-base-300">
+                    <input type="checkbox" className="peer" />
+                    <div className="collapse-title text-sm font-medium">
+                      상세 내용 보기 ({request.summary.totalItems}개 항목)
+                    </div>
+                    <div className="collapse-content">
+                      <div className="space-y-4">
+                        {/* 마크업 피드백 */}
+                        {request.items.markupFeedbacks.length > 0 && (
+                          <div>
+                            <h6 className="font-medium text-primary mb-2">🎯 마크업 피드백</h6>
+                            <div className="space-y-3">
+                              {request.items.markupFeedbacks.map((item: any) => (
+                                <div key={item.id} className="bg-base-50 p-3 rounded border-l-4 border-primary">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className="font-medium">마크업 #{item.markupNumber}</span>
+                                    <span className="badge badge-primary badge-xs">{item.markupType}</span>
+                                    <span className={`badge badge-xs ${
+                                      item.priority === 'high' ? 'badge-error' :
+                                      item.priority === 'medium' ? 'badge-warning' : 'badge-success'
+                                    }`}>
+                                      {item.priority}
+                                    </span>
+                                  </div>
+                                  
+                                  {/* 제목 (중복 제거) */}
+                                  <h5 className="text-sm font-medium text-primary mb-1">{item.title}</h5>
+                                  
+                                  {/* 설명 (HTML 태그 제거) */}
+                                  {item.description && (
+                                    <p className="text-sm text-base-content/70 mb-2">
+                                      {item.description.replace(/<[^>]*>/g, '')}
+                                    </p>
+                                  )}
+                                  
+                                  {/* 추가 텍스트 */}
+                                  {item.additionalText && (
+                                    <p className="text-sm text-base-content/60 bg-base-200 p-2 rounded mb-2">
+                                      💡 {item.additionalText}
+                                    </p>
+                                  )}
+                                  
+                                  {/* 레퍼런스 URL */}
+                                  {item.referenceUrls && item.referenceUrls.length > 0 && (
+                                    <div className="mb-2">
+                                      <p className="text-xs font-medium text-base-content/70 mb-1">레퍼런스:</p>
+                                      {item.referenceUrls.map((url: string, index: number) => (
+                                        <a
+                                          key={index}
+                                          href={url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-xs text-primary hover:underline block truncate"
+                                        >
+                                          🔗 {url}
+                                        </a>
+                                      ))}
+                                    </div>
+                                  )}
+                                  
+                                  {/* 댓글 섹션 */}
+                                  <div className="flex items-center gap-4 mt-2">
+                                    <button
+                                      onClick={() => toggleComments(item.id)}
+                                      className="text-xs text-primary hover:underline flex items-center gap-1"
+                                    >
+                                      💬 댓글 {item.commentCount}개 
+                                      <span className={`transform transition-transform ${
+                                        expandedComments.has(item.id) ? 'rotate-90' : ''
+                                      }`}>
+                                        ▶
+                                      </span>
+                                    </button>
+                                    {item.hasUnresolvedComments && (
+                                      <span className="badge badge-error badge-xs">미해결</span>
+                                    )}
+                                  </div>
+                                  
+                                  {/* 댓글 내용 */}
+                                  {expandedComments.has(item.id) && (
+                                    <div className="mt-3 border-t border-base-200 pt-3">
+                                      {item.comments && item.comments.length > 0 ? (
+                                        <div className="space-y-2">
+                                          {item.comments.map((comment: any, commentIndex: number) => (
+                                            <div key={commentIndex} className="bg-white p-2 rounded border text-sm">
+                                              <div className="flex items-center gap-2 mb-1">
+                                                <span className="font-medium">{comment.author || '익명'}</span>
+                                                <span className="text-xs text-base-content/60">
+                                                  {comment.createdAt ? new Date(comment.createdAt).toLocaleDateString('ko-KR') : ''}
+                                                </span>
+                                                {comment.isResolved && (
+                                                  <span className="badge badge-success badge-xs">해결됨</span>
+                                                )}
+                                              </div>
+                                              <p className="text-base-content/80">{comment.content}</p>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <p className="text-xs text-base-content/60 text-center py-2">
+                                          댓글이 없습니다
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* 일반 피드백 */}
+                        {request.items.generalFeedbacks.length > 0 && (
+                          <div>
+                            <h6 className="font-medium text-info mb-2">💬 일반 피드백</h6>
+                            <div className="space-y-3">
+                              {request.items.generalFeedbacks.map((item: any) => (
+                                <div key={item.id} className="bg-base-50 p-3 rounded border-l-4 border-info">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className="badge badge-info badge-xs">{item.category}</span>
+                                    <span className={`badge badge-xs ${
+                                      item.priority === 'high' ? 'badge-error' :
+                                      item.priority === 'medium' ? 'badge-warning' : 'badge-success'
+                                    }`}>
+                                      {item.priority}
+                                    </span>
+                                  </div>
+                                  
+                                  {/* 제목 */}
+                                  <h5 className="text-sm font-medium text-info mb-1">{item.title}</h5>
+                                  
+                                  {/* 설명 (HTML 태그 제거) */}
+                                  {item.description && (
+                                    <div className="text-sm text-base-content/70 mb-2">
+                                      {item.description.replace(/<[^>]*>/g, '')}
+                                    </div>
+                                  )}
+                                  
+                                  {/* 댓글 섹션 */}
+                                  <div className="flex items-center gap-4 mt-2">
+                                    <button
+                                      onClick={() => toggleComments(item.id)}
+                                      className="text-xs text-primary hover:underline flex items-center gap-1"
+                                    >
+                                      💬 댓글 {item.commentCount}개 
+                                      <span className={`transform transition-transform ${
+                                        expandedComments.has(item.id) ? 'rotate-90' : ''
+                                      }`}>
+                                        ▶
+                                      </span>
+                                    </button>
+                                    {item.hasUnresolvedComments && (
+                                      <span className="badge badge-error badge-xs">미해결</span>
+                                    )}
+                                  </div>
+                                  
+                                  {/* 댓글 내용 */}
+                                  {expandedComments.has(item.id) && (
+                                    <div className="mt-3 border-t border-base-200 pt-3">
+                                      {item.comments && item.comments.length > 0 ? (
+                                        <div className="space-y-2">
+                                          {item.comments.map((comment: any, commentIndex: number) => (
+                                            <div key={commentIndex} className="bg-white p-2 rounded border text-sm">
+                                              <div className="flex items-center gap-2 mb-1">
+                                                <span className="font-medium">{comment.author || '익명'}</span>
+                                                <span className="text-xs text-base-content/60">
+                                                  {comment.createdAt ? new Date(comment.createdAt).toLocaleDateString('ko-KR') : ''}
+                                                </span>
+                                                {comment.isResolved && (
+                                                  <span className="badge badge-success badge-xs">해결됨</span>
+                                                )}
+                                              </div>
+                                              <p className="text-base-content/80">{comment.content}</p>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <p className="text-xs text-base-content/60 text-center py-2">
+                                          댓글이 없습니다
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* 체크리스트 항목 */}
+                        {request.items.checklistItems.length > 0 && (
+                          <div>
+                            <h6 className="font-medium text-secondary mb-2">📝 체크리스트</h6>
+                            <div className="space-y-2">
+                              {request.items.checklistItems.map((item: any) => (
+                                <div key={item.id} className="bg-base-50 p-3 rounded border-l-4 border-secondary">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="badge badge-secondary badge-xs">{item.type}</span>
+                                    <span className={`badge badge-xs ${
+                                      item.priority === 'high' ? 'badge-error' :
+                                      item.priority === 'medium' ? 'badge-warning' : 'badge-success'
+                                    }`}>
+                                      {item.priority}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm font-medium">{item.title}</p>
+                                  {item.description && (
+                                    <p className="text-sm text-base-content/70 mt-1">{item.description}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* 기존 체크리스트 기반 제출된 수정요청 (하위 호환성) */}
+      <div className="card bg-base-100 shadow-sm">
+        <div className="card-body p-4">
+          {/* 헤더 */}
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="font-medium">📋 기존 제출된 수정요청</h4>
+            <div className="flex items-center gap-2">
+              <div className="badge badge-info badge-sm">
+                총 {checklistItems.filter(item => !item.isRevisionHeader).length}개 항목
             </div>
             <div className={`badge badge-sm ${remainingRevisions > 0 ? 'badge-success' : 'badge-error'}`}>
               수정 {remainingRevisions}/{totalRevisions}회 남음
@@ -414,6 +705,7 @@ export default function SubmittedModificationRequests({
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
