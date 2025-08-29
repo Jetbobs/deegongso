@@ -17,7 +17,11 @@
       "Bash(pkill:*)",
       "Bash(taskkill:*)",
       "Bash(curl:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Read(C:\\Users\\share\\onemoreRev/**)",
+      "Read(C:\\Users\\share\\onemoreRev\\backend/**)",
+      "Read(C:\\Users\\share\\onemoreRev\\backend/**)",
+      "Bash(move:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits",

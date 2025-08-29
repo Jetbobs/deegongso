@@ -319,7 +319,7 @@ export default function SubmittedModificationRequests({
                                     <div className="mt-3 border-t border-base-200 pt-3">
                                       {item.comments && item.comments.length > 0 ? (
                                         <div className="space-y-2">
-                                          {item.comments.map((comment: { author: string; content: string; timestamp: string }, commentIndex: number) => (
+                                          {item.comments.map((comment: any, commentIndex: number) => (
                                             <div key={commentIndex} className="bg-white p-2 rounded border text-sm">
                                               <div className="flex items-center gap-2 mb-1">
                                                 <span className="font-medium">{comment.author || '익명'}</span>
@@ -335,9 +335,10 @@ export default function SubmittedModificationRequests({
                                           ))}
                                         </div>
                                       ) : (
-                                        <p className="text-xs text-base-content/60 text-center py-2">
-                                          댓글이 없습니다
-                                        </p>
+                                        <div className="text-xs text-base-content/60 text-center py-2">
+                                          <p>댓글이 없습니다</p>
+                                          <p className="text-red-500 mt-1">디버깅: commentCount={item.commentCount || 0}, hasComments={!!(item.comments)}</p>
+                                        </div>
                                       )}
                                     </div>
                                   )}
@@ -397,7 +398,7 @@ export default function SubmittedModificationRequests({
                                     <div className="mt-3 border-t border-base-200 pt-3">
                                       {item.comments && item.comments.length > 0 ? (
                                         <div className="space-y-2">
-                                          {item.comments.map((comment: { author: string; content: string; timestamp: string }, commentIndex: number) => (
+                                          {item.comments.map((comment: any, commentIndex: number) => (
                                             <div key={commentIndex} className="bg-white p-2 rounded border text-sm">
                                               <div className="flex items-center gap-2 mb-1">
                                                 <span className="font-medium">{comment.author || '익명'}</span>
@@ -413,9 +414,10 @@ export default function SubmittedModificationRequests({
                                           ))}
                                         </div>
                                       ) : (
-                                        <p className="text-xs text-base-content/60 text-center py-2">
-                                          댓글이 없습니다
-                                        </p>
+                                        <div className="text-xs text-base-content/60 text-center py-2">
+                                          <p>댓글이 없습니다</p>
+                                          <p className="text-red-500 mt-1">디버깅: commentCount={item.commentCount || 0}, hasComments={!!(item.comments)}</p>
+                                        </div>
                                       )}
                                     </div>
                                   )}

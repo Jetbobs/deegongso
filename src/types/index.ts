@@ -1092,8 +1092,8 @@ export interface SubmittedModificationRequestData {
   description?: string; // 수정요청 설명
   approvedAt?: string; // 승인 시간
   items: {
-    generalFeedbacks: Feedback[];
-    markupFeedbacks: MarkupFeedback[];
+    generalFeedbacks: (Feedback & Record<string, unknown>)[]; // 댓글 정보가 추가된 Feedback 객체들
+    markupFeedbacks: (MarkupFeedback & Record<string, unknown>)[]; // 댓글 정보가 추가된 MarkupFeedback 객체들
     checklistItems: ChecklistItem[];
   };
   totalItems: number;
